@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Highlands 2026 🏴󠁧󠁢󠁳󠁣󠁴󠁿</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; }
+a { color: #58a6ff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; overflow: hidden; }
+details summary { list-style: none; cursor: pointer; }
+details summary::-webkit-details-marker { display: none; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.bg { background: #0d4a2e; color: #56d364; border: 1px solid #238636; }
+.bb { background: #0c2d6b; color: #79c0ff; border: 1px solid #1f6feb; }
+.br { background: #5e0d0d; color: #ff7b72; border: 1px solid #da3633; }
+.bo { background: #5a2800; color: #ffa657; border: 1px solid #db6d28; }
+.bgy { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+.btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #30363d; background: #21262d; color: #e6edf3; cursor: pointer; font-size: 14px; font-weight: 500; transition: background .15s; }
+.btn:hover { background: #30363d; }
+.btn-g { background: #196c2e; border-color: #238636; color: #56d364; }
+.btn-g:hover { background: #238636; }
+.av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; border: 2px solid #30363d; color: #8b949e; background: #21262d; user-select: none; flex-shrink: 0; }
+.av.on { border-color: var(--ac); color: var(--ac); background: var(--abg); }
+.av.me { box-shadow: 0 0 0 2px #58a6ff; }
+.stat-box { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; }
+.sv { font-size: 20px; font-weight: 700; color: #56d364; }
+.sl { font-size: 11px; color: #8b949e; margin-top: 2px; }
+nav { background: #161b22; border-bottom: 1px solid #30363d; overflow-x: auto; display: flex; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+nav::-webkit-scrollbar { display: none; }
+.tab { padding: 12px 18px; background: none; border: none; border-bottom: 2px solid transparent; color: #8b949e; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; transition: all .15s; }
+.tab.on { color: #56d364; border-bottom-color: #56d364; }
+.tab:hover:not(.on) { color: #e6edf3; }
+.day-hdr { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 16px; gap: 12px; }
+.chev { transition: transform .2s; color: #8b949e; flex-shrink: 0; margin-top: 4px; }
+details[open] .chev { transform: rotate(180deg); }
+.irow { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid #21262d; font-size: 14px; }
+.ico { width: 22px; flex-shrink: 0; text-align: center; margin-top: 1px; }
+.ilbl { color: #8b949e; min-width: 88px; flex-shrink: 0; font-size: 13px; }
+.sh { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+input[type="text"] { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; color: #e6edf3; font-size: 14px; outline: none; }
+input[type="text"]:focus { border-color: #58a6ff; }
+.notebox { background: #2d1f00; border: 1px solid #db6d28; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #ffa657; margin-top: 10px; }
+.tt { font-size: 28px; font-weight: 800; }
+.ts { font-size: 13px; color: #8b949e; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { color: #8b949e; font-weight: 600; padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; }
+td { padding: 10px 12px; border-bottom: 1px solid #21262d; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.modal-ov { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal { background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 32px; max-width: 380px; width: 92%; text-align: center; }
+.upick { width: 90px; height: 90px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; cursor: pointer; border: 2px solid #30363d; background: #21262d; color: #8b949e; transition: all .15s; }
+.upick:hover { transform: scale(1.05); }
+@media(max-width:500px){.tt{font-size:22px;}.stat-box{padding:8px;}.sv{font-size:17px;}}
+</style>
+</head>
+<body>
+
+<!-- User Modal -->
+<div id="umodal" class="modal-ov">
+  <div class="modal">
+    <div style="font-size:54px;margin-bottom:14px;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
+    <h2 style="font-size:22px;font-weight:800;margin-bottom:8px;">Highlands 2026</h2>
+    <p style="color:#8b949e;font-size:14px;margin-bottom:28px;">Wybierz swoje imię, żeby śledzić postęp zadań i pakowania</p>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button class="upick" onclick="selUser('dan')" style="border-color:#238636;color:#56d364;background:#0d4a2e;">Dan</button>
+      <button class="upick" onclick="selUser('kuba')" style="border-color:#1f6feb;color:#79c0ff;background:#0c2d6b;">Kuba</button>
+      <button class="upick" onclick="selUser('maciek')" style="border-color:#8250df;color:#d2a8ff;background:#2d1f5e;">Maciek</button>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<div style="background:#161b22;border-bottom:1px solid #30363d;padding:13px 20px;position:sticky;top:0;z-index:99;">
+  <div style="max-width:920px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:30px;line-height:1;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</span>
+      <div>
+        <div style="font-size:17px;font-weight:700;">Highlands 2026</div>
+        <div style="font-size:12px;color:#8b949e;">5–12 sierpnia · Inverness Loop · 533 km</div>
+      </div>
+    </div>
+    <button onclick="document.getElementById('umodal').style.display='flex'" id="ubadge" class="btn" style="font-size:13px;">👤 —</button>
+  </div>
+</div>
+
+<!-- Nav -->
+<nav style="position:sticky;top:65px;z-index:98;">
+  <div style="max-width:920px;margin:0 auto;display:flex;">
+    <button class="tab on" onclick="goTab('plan',this)">📅 Plan</button>
+    <button class="tab" onclick="goTab('train',this)">🚂 Pociągi</button>
+    <button class="tab" onclick="goTab('budget',this)">💰 Koszty</button>
+    <button class="tab" onclick="goTab('tasks',this)">✅ Zadania</button>
+    <button class="tab" onclick="goTab('packing',this)">🎒 Pakowanie</button>
+  </div>
+</nav>
+
+<main style="max-width:920px;margin:0 auto;padding:20px 16px 80px;">
+
+<!-- PLAN -->
+<div id="tp"></div>
+
+<!-- TRAIN -->
+<div id="tt" style="display:none;">
+  <div class="sh">🚂 Plan pociągów</div>
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;">
+    🎫 Nr rezerwacji: <strong style="font-size:16px;letter-spacing:2px;color:#e6edf3;">KGNKTJWG</strong>
+  </div>
+  <div style="display:grid;gap:16px;">
+    <!-- Wyjazd -->
+    <div class="card">
+      <div style="padding:14px 16px 0;display:flex;gap:8px;align-items:center;">
+        <span class="badge bg">Wyjazd</span>
+        <span style="font-size:13px;color:#8b949e;">czwartek 6 sierpnia</span>
+      </div>
+      <div style="padding:16px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <div><div class="tt">10:33</div><div class="ts">Edinburgh Waverley</div></div>
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">3h 43m · ScotRail · bezpośredni</div>
+            <div style="height:2px;background:linear-gradient(to right,#238636,#56d364);border-radius:2px;"></div>
+          </div>
+          <div style="text-align:right;"><div class="tt">14:16</div><div class="ts">Inverness</div></div>
+        </div>
+        <div style="background:#21262d;border-radius:8px;padding:12px;">
+          <div style="font-size:12px;color:#8b949e;font-weight:600;margin-bottom:10px;">🪑 Zarezerwowane miejsca</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:#56d364;font-weight:600;">Dan</div>
+              <div style="font-weight:700;font-size:15px;">E · 29F</div>
+              <div style="font-size:11px;color:#8b949e;">okno</div>
+            </div>
+            <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:#79c0ff;font-weight:600;">Kuba</div>
+              <div style="font-weight:700;font-size:15px;">E · 30B</div>
+              <div style="font-size:11px;color:#8b949e;">okno</div>
+            </div>
+            <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:#d2a8ff;font-weight:600;">Maciek</div>
+              <div style="font-weight:700;font-size:15px;">E · 30F</div>
+              <div style="font-size:11px;color:#8b949e;">okno</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:8px 12px;background:#161b22;border-radius:6px;font-size:12px;color:#ffa657;">
+            🚲 Miejsca na rowery zarezerwowane — dowolna wolna przestrzeń na rowery
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Powrót -->
+    <div class="card">
+      <div style="padding:14px 16px 0;display:flex;gap:8px;align-items:center;">
+        <span class="badge bb">Powrót</span>
+        <span style="font-size:13px;color:#8b949e;">wtorek 11 sierpnia</span>
+      </div>
+      <div style="padding:16px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <div><div class="tt">18:52</div><div class="ts">Inverness</div></div>
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">3h 23m · ScotRail · bezpośredni</div>
+            <div style="height:2px;background:linear-gradient(to right,#1f6feb,#79c0ff);border-radius:2px;"></div>
+          </div>
+          <div style="text-align:right;"><div class="tt">22:15</div><div class="ts">Edinburgh Waverley</div></div>
+        </div>
+        <div style="background:#21262d;border-radius:8px;padding:12px;">
+          <div style="font-size:12px;color:#8b949e;font-weight:600;margin-bottom:10px;">🪑 Zarezerwowane miejsca</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:#56d364;font-weight:600;">Dan</div>
+              <div style="font-weight:700;font-size:15px;">B · 21F</div>
+              <div style="font-size:11px;color:#8b949e;">okno</div>
+            </div>
+            <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:#79c0ff;font-weight:600;">Kuba</div>
+              <div style="font-weight:700;font-size:15px;">B · 22B</div>
+              <div style="font-size:11px;color:#8b949e;">okno</div>
+            </div>
+            <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:#d2a8ff;font-weight:600;">Maciek</div>
+              <div style="font-weight:700;font-size:15px;">B · 22F</div>
+              <div style="font-size:11px;color:#8b949e;">okno</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;padding:8px 12px;background:#161b22;border-radius:6px;font-size:12px;color:#ffa657;">
+            🚲 Miejsca na rowery zarezerwowane — dowolna wolna przestrzeń na rowery
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BUDGET -->
+<div id="tb" style="display:none;">
+  <div class="sh">💰 Kosztorys</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
+    <div class="stat-box"><div class="sv">4 938</div><div class="sl">PLN / osoba łącznie</div></div>
+    <div class="stat-box"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
+    <div class="stat-box"><div class="sv">5 523</div><div class="sl">m przewyższenia</div></div>
+  </div>
+  <div class="card" style="margin-bottom:20px;">
+    <div style="padding:14px 16px;border-bottom:1px solid #21262d;font-weight:700;font-size:15px;">Podział kosztów na osobę</div>
+    <table>
+      <thead><tr><th>Pozycja</th><th style="text-align:right;">Na osobę</th><th style="text-align:right;">Total (3 os.)</th></tr></thead>
+      <tbody>
+        <tr><td>Noclegi na trasie</td><td style="text-align:right;color:#56d364;font-weight:600;">1 405 zł</td><td style="text-align:right;color:#8b949e;">4 214 zł</td></tr>
+        <tr><td>Loty</td><td style="text-align:right;color:#56d364;font-weight:600;">1 159 zł</td><td style="text-align:right;color:#8b949e;">3 476 zł</td></tr>
+        <tr><td>Pociąg tam i z powrotem</td><td style="text-align:right;color:#56d364;font-weight:600;">345 zł</td><td style="text-align:right;color:#8b949e;">1 036 zł</td></tr>
+        <tr><td>Taxi z lotniska (obie strony)</td><td style="text-align:right;color:#56d364;font-weight:600;">350 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
+        <tr><td>2 noclegi w Edynburgu</td><td style="text-align:right;color:#56d364;font-weight:600;">0 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
+        <tr><td>Karton / pudło na rower</td><td style="text-align:right;color:#56d364;font-weight:600;">280 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
+        <tr><td>Jedzenie (50 GBP/os/dzień × 7 dni)</td><td style="text-align:right;color:#56d364;font-weight:600;">1 400 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
+        <tr style="font-weight:700;font-size:15px;"><td>RAZEM</td><td style="text-align:right;color:#ffa657;">4 938 zł</td><td style="text-align:right;"></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <div style="padding:14px 16px;border-bottom:1px solid #21262d;font-weight:700;font-size:15px;">Historia transakcji</div>
+    <table>
+      <thead><tr><th>Data</th><th>Opis</th><th style="text-align:right;">Total</th><th style="text-align:right;">/ osoba</th></tr></thead>
+      <tbody>
+        <tr><td style="white-space:nowrap;">12.01</td><td>Loty + nocleg Achnaseen</td><td style="text-align:right;">4 160 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">1 387 zł</td></tr>
+        <tr><td style="white-space:nowrap;">13.01</td><td>Nocleg Ratagan</td><td style="text-align:right;">1 029 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">343 zł</td></tr>
+        <tr><td style="white-space:nowrap;">17.01</td><td>Nocleg Dundonnell</td><td style="text-align:right;">1 049 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">350 zł</td></tr>
+        <tr><td style="white-space:nowrap;">5.07</td><td>Pociągi</td><td style="text-align:right;">1 036 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">345 zł</td></tr>
+        <tr style="background:#1a1000;">
+          <td style="white-space:nowrap;color:#ffa657;">do 2.08</td>
+          <td style="color:#ffa657;">Fort Augustus (Morag's Lodge)</td>
+          <td style="text-align:right;color:#ffa657;">606 zł</td>
+          <td style="text-align:right;color:#ffa657;font-weight:600;">202 zł</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding:12px 16px;font-size:12px;color:#8b949e;background:#0d1117;border-top:1px solid #21262d;border-radius:0 0 12px 12px;">
+      💬 Kuba przelał ✓ &nbsp;·&nbsp; Maciek przelał ✓ &nbsp;(wszystkie dotychczasowe transakcje)
+    </div>
+  </div>
+</div>
+
+<!-- TASKS -->
+<div id="tts" style="display:none;">
+  <div class="sh">✅ Zadania przed wyjazdem</div>
+  <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Każdy odznacza swoje zadania. Kliknij swój avatar żeby zmienić status.</p>
+  <div id="tasklist" style="display:flex;flex-direction:column;gap:10px;"></div>
+</div>
+
+<!-- PACKING -->
+<div id="tpk" style="display:none;">
+  <div class="sh">🎒 Lista pakunkowa</div>
+  <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Zaznacz co już spakowałeś. Możesz dodawać i usuwać rzeczy.</p>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <input type="text" id="newitem" placeholder="Dodaj nowy przedmiot..." style="flex:1;" onkeydown="if(event.key==='Enter')addItem()">
+    <button class="btn btn-g" onclick="addItem()">+ Dodaj</button>
+  </div>
+  <div id="packlist" style="display:flex;flex-direction:column;gap:8px;"></div>
+</div>
+
+</main>
+
+<script>
+const SB_URL = 'https://axbgkvswfzsrvtvjrskh.supabase.co';
+const SB_KEY = 'sb_publishable_fLytrxqd7-8T79l-YA9xig_ZAw7c2oN';
+const db = supabase.createClient(SB_URL, SB_KEY);
+
+let me = localStorage.getItem('hlds_user');
+let chk = {};
+let pkgs = [];
+
+const PS = ['dan','kuba','maciek'];
+const PL = {dan:'Dan',kuba:'Kuba',maciek:'Maciek'};
+const PC = {dan:'#56d364',kuba:'#79c0ff',maciek:'#d2a8ff'};
+const PBG = {dan:'#0d4a2e',kuba:'#0c2d6b',maciek:'#2d1f5e'};
+
+const TASKS = [
+  {id:'jedzenie',  label:'Obliczyć i zaplanować jedzenie na trasę',            icon:'🍌'},
+  {id:'transport', label:'Załatwić transport z lotniska (w obie strony)',        icon:'🚕'},
+  {id:'gpx',       label:'Wygenerować pliki GPX dla każdego etapu',             icon:'🗺️'},
+  {id:'karton',    label:'Zamówić / zorganizować karton na rower',               icon:'📦'},
+  {id:'serwis',    label:'Serwis rowerowy przed wyjazdem',                       icon:'🔧'},
+  {id:'ubezp',     label:'Ubezpieczenie podróżne',                               icon:'🛡️'},
+  {id:'mapy',      label:'Ściągnąć mapy offline (Mapy.cz / Komoot)',             icon:'📱'},
+  {id:'pociag',    label:'Pociąg do/z Edynburga — bilety krajowe',              icon:'🚆'},
+  {id:'eta',       label:'Aktywować kartę / zabrać GBP w gotówce',              icon:'💳'},
+];
+
+const DAYS = [
+  {
+    date:'5.08',dow:'środa',ico:'✈️',
+    title:'Przylot — Edynburg',
+    desc:'Przylot wieczorem. Nocleg u dziewczyn w Musselburgh.',
+    km:null,el:null,map:null,acc:null,rest:null,shop:null,note:null,
+  },
+  {
+    date:'6.08',dow:'czwartek',ico:'🚂',
+    title:'Edynburg → Fort Augustus',
+    desc:'Pociąg Edinburgh Waverley → Inverness (10:33–14:16), po południu ruszamy na trasę.',
+    km:56.9,el:585,map:'https://mapy.com/s/dozovegege',
+    acc:{name:"Morag's Lodge",
+         url:'https://www.booking.com/hotel/gb/morag-s-lodge.en-gb.html',
+         cost:'606 zł',pay:'Pay nothing until 2 August 2026',
+         cancel:'Free cancellation before 4 August 2026',
+         breakfast:'32 zł / osoba'},
+    rest:"Highland Hideout (8pm) · Beaufort House PIZZA (8:30pm)",
+    shop:'Spar — centrum Fort Augustus',
+    note:null,
+  },
+  {
+    date:'7.08',dow:'piątek',ico:'🚵',
+    title:'Fort Augustus → Ratagan',
+    desc:'Dzień 2. Przez Great Glen i Glen Shiel.',
+    km:103,el:1119,map:'https://mapy.com/s/mufalaluko',
+    acc:{name:'Ratagan Youth Hostel (SYHA)',
+         url:'https://www.booking.com/hotel/gb/ratagan-youth-hostel-syha-hostelling-scotland.en-gb.html',
+         cost:'1 029 zł',pay:'zapłacone',
+         cancel:'Free cancellation before 4 August 2026',
+         breakfast:'32 zł / osoba'},
+    rest:'Kintail Lodge Hotel (8pm, rezerwacja?) · The Pitstop at Kintail',
+    shop:"Eilean Donan Visitor's Centre w Dornie",
+    note:null,
+  },
+  {
+    date:'8.08',dow:'sobota',ico:'🚵',
+    title:'Ratagan → Achnaseen',
+    desc:'Dzień 3. Przez Torridon.',
+    km:88,el:1160,map:'https://mapy.com/s/hepezubulo',
+    acc:{name:'Ledgowan Bunkhouse',
+         url:'https://www.booking.com/hotel/gb/ledgowan-bunkhouse.en-gb.html',
+         cost:'684 zł',pay:'zapłacone',
+         cancel:'⚠️ BRAK możliwości odwołania',
+         breakfast:'The Midge Bite Cafe Achnasheen'},
+    rest:'Kinlochewe Hotel — The Stag Highland Restaurant',
+    shop:'Poolewe — Mace',
+    note:'⚠️ Trzeba kupić śpiwór za 10 GBP na miejscu. Brak śniadania i kolacji w cenie noclegu.',
+  },
+  {
+    date:'9.08',dow:'niedziela',ico:'🚵',
+    title:'Achnaseen → Dundonnell',
+    desc:'Dzień 4. Największe przewyższenie całej trasy.',
+    km:93,el:1183,map:'https://mapy.com/s/mebemahuda',
+    acc:{name:'The Dundonnell Hotel',
+         url:'https://www.booking.com/hotel/gb/the-dundonnell.en-gb.html',
+         cost:'1 044 zł',pay:'zapłacone',
+         cancel:'Free cancellation before 7 August 2026',
+         breakfast:'w cenie'},
+    rest:'Kolacja w hotelu (18:00–20:00)',
+    shop:'Ullapool — Tesco',
+    note:null,
+  },
+  {
+    date:'10.08',dow:'poniedziałek',ico:'🚵',
+    title:'Dundonnell → Bonar Bridge',
+    desc:'Dzień 5.',
+    km:90,el:996,map:'https://mapy.com/s/lufevaraku',
+    acc:{name:'Dunroamin Hotel',
+         url:'https://www.booking.com/hotel/gb/dunroamin-hotel.en-gb.html',
+         cost:'851 zł',pay:'zapłacone',
+         cancel:'Bezpłatne odwołanie do 2 August 2026 23:59',
+         breakfast:'w cenie'},
+    rest:'Kolacja w hotelu',
+    shop:'Spar — centrum Bonar Bridge',
+    note:null,
+  },
+  {
+    date:'11.08',dow:'wtorek',ico:'🏁',
+    title:'Bonar Bridge → Inverness → Edynburg',
+    desc:'Dzień 6 — ostatni etap. Pociąg powrotny z Inverness (18:52–22:15).',
+    km:102.5,el:680,map:'https://mapy.com/s/letosucefu',
+    acc:{name:'Nocleg u dziewczyn w Musselburgh',url:null,cost:null,pay:null,cancel:null,breakfast:null},
+    rest:'Coś w Inverness przed pociągiem',
+    shop:null,
+    note:'🚂 Pociąg: Inverness 18:52 → Edinburgh Waverley 22:15 (wagon B)',
+  },
+  {
+    date:'12.08',dow:'środa',ico:'🏙️',
+    title:'Edynburg — zwiedzanie',
+    desc:'Ostatni dzień. Wylot o 21:40.',
+    km:null,el:null,map:null,acc:null,rest:null,shop:null,
+    note:'✈️ Wylot: 21:40',
+  },
+];
+
+const DEFAULT_PKG = [
+  'Dętka zapasowa (×2)','Łatki do dętki','Pompka (mini)',
+  'Multi-tool rowerowy + klucze imbusowe','Ogniwo łańcucha zapasowe',
+  'Kurtka przeciwdeszczowa','Spodnie rowerowe (×2)','Koszulka rowerowa (×2)',
+  'Skarpety (×3)','Bielizna (×3)','Koszulka na wieczór','Bluza / midlayer',
+  'Kask','Buty rowerowe','Rękawiczki rowerowe','Okulary / gogle',
+  'Krem z filtrem UV','Spray na meszki 🦟 (BARDZO ważny w Szkocji!)',
+  'Powerbank','Ładowarka + adapter UK 🔌','Telefon z mapami offline',
+  'Dowód osobisty / paszport','Karta + GBP w gotówce',
+  'Leki (podstawowe)','Apteczka','Ręcznik',
+  'Przybory toaletowe (mini)','Śpiwór (Ledgowan Bunkhouse pobiera 10 GBP za wypożyczenie)',
+  'Kłódka do roweru','Sakwy / torby na rower','Odblask + światełka',
+];
+
+// ===== INIT =====
+async function init() {
+  if (!me) { document.getElementById('umodal').style.display='flex'; }
+  else { document.getElementById('umodal').style.display='none'; updBadge(); }
+  renderPlan();
+  await loadChk();
+  renderTasks();
+  await loadPkg();
+  if (pkgs.length===0) await seedPkg();
+  renderPack();
+  setInterval(async()=>{ await loadChk(); renderTasks(); await loadPkg(); renderPack(); }, 30000);
+}
+
+function selUser(u) {
+  me=u; localStorage.setItem('hlds_user',u);
+  document.getElementById('umodal').style.display='none';
+  updBadge(); renderTasks(); renderPack();
+}
+
+function updBadge() {
+  const b=document.getElementById('ubadge');
+  b.textContent='👤 '+PL[me];
+  b.style.borderColor=PC[me]; b.style.color=PC[me];
+}
+
+// ===== TABS =====
+function goTab(name, btn) {
+  ['tp','tt','tb','tts','tpk'].forEach(id=>document.getElementById(id).style.display='none');
+  const map={plan:'tp',train:'tt',budget:'tb',tasks:'tts',packing:'tpk'};
+  document.getElementById(map[name]).style.display='block';
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+}
+
+// ===== PLAN =====
+function renderPlan() {
+  document.getElementById('tp').innerHTML = DAYS.map((d,i)=>dayCard(d,i)).join('');
+}
+
+function dayCard(d, i) {
+  const stats = d.km ? `
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+      <span class="badge bg">🚴 ${d.km} km</span>
+      <span class="badge bo">⛰️ ${d.el} m</span>
+    </div>` : '';
+
+  let body = '';
+
+  if (d.map) {
+    body += `<div style="margin-bottom:12px;">
+      <iframe src="${d.map}" style="width:100%;height:260px;border-radius:8px;border:none;" loading="lazy" allowfullscreen></iframe>
+    </div>`;
+  }
+
+  if (d.acc && d.acc.name) {
+    const a = d.acc;
+    const cancelCls = a.cancel && a.cancel.includes('⚠️') ? 'br' : 'bg';
+    body += `<div class="irow">
+      <div class="ico">🏠</div>
+      <div class="ilbl">Nocleg</div>
+      <div style="flex:1;">
+        ${a.url ? `<a href="${a.url}" target="_blank" rel="noopener" style="font-weight:600;">${a.name}</a>` : `<span style="font-weight:600;">${a.name}</span>`}
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;">
+          ${a.pay==='zapłacone' ? '<span class="badge bb">✓ zapłacone</span>' : a.pay ? `<span class="badge bo">${a.pay}</span>` : ''}
+          ${a.cancel ? `<span class="badge ${cancelCls}" style="font-size:10px;">${a.cancel}</span>` : ''}
+          ${a.cost ? `<span class="badge bgy">${a.cost} total</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+    if (a.breakfast) body += `<div class="irow"><div class="ico">🍳</div><div class="ilbl">Śniadanie</div><div>${a.breakfast}</div></div>`;
+  }
+  if (d.rest) body += `<div class="irow"><div class="ico">🍽️</div><div class="ilbl">Restauracja</div><div>${d.rest}</div></div>`;
+  if (d.shop) body += `<div class="irow"><div class="ico">🛒</div><div class="ilbl">Sklep</div><div>${d.shop}</div></div>`;
+  if (d.note) body += `<div class="notebox">${d.note}</div>`;
+
+  return `<div class="card" style="margin-bottom:12px;">
+    <details ${i===0?'open':''}>
+      <summary>
+        <div class="day-hdr">
+          <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0;">
+            <div style="text-align:center;flex-shrink:0;">
+              <div style="font-size:22px;">${d.ico}</div>
+              <div style="font-size:11px;color:#8b949e;margin-top:2px;">${d.date}</div>
+              <div style="font-size:10px;color:#6b7280;">${d.dow}</div>
+            </div>
+            <div style="min-width:0;">
+              <div style="font-weight:700;font-size:15px;line-height:1.3;">${d.title}</div>
+              <div style="font-size:13px;color:#8b949e;margin-top:3px;">${d.desc||''}</div>
+              ${stats}
+            </div>
+          </div>
+          <svg class="chev" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+        </div>
+      </summary>
+      ${body ? `<div style="padding:0 16px 16px;">${body}</div>` : ''}
+    </details>
+  </div>`;
+}
+
+// ===== SUPABASE CHECKS =====
+async function loadChk() {
+  try {
+    const {data,error}=await db.from('checks').select('*');
+    if(error) throw error;
+    chk={};
+    (data||[]).forEach(r=>{chk[r.id]=r.checked;});
+  } catch(e){ console.warn('loadChk:',e.message); }
+}
+
+async function togChk(id) {
+  const v=!chk[id]; chk[id]=v;
+  renderTasks();
+  try { await db.from('checks').upsert({id,checked:v,updated_at:new Date().toISOString()}); }
+  catch(e){ console.warn('togChk:',e); }
+}
+
+function renderTasks() {
+  const c=document.getElementById('tasklist');
+  if(!c) return;
+  c.innerHTML=TASKS.map(t=>{
+    const allDone=PS.every(p=>chk[`t_${t.id}_${p}`]);
+    const avs=PS.map(p=>{
+      const id=`t_${t.id}_${p}`;
+      const on=chk[id];
+      const isMe=p===me;
+      return `<div class="av${on?' on':''}${isMe?' me':''}"
+        style="${on?`--ac:${PC[p]};--abg:${PBG[p]};`:''}"
+        title="${PL[p]}${isMe?' (Ty)':''}"
+        onclick="${isMe?`togChk('${id}')`:''}"
+        >${on?'✓':PL[p][0]}</div>`;
+    }).join('');
+    return `<div style="background:#161b22;border:1px solid ${allDone?'#238636':'#30363d'};border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:20px;flex-shrink:0;">${t.icon}</div>
+      <div style="flex:1;font-size:14px;font-weight:500;${allDone?'text-decoration:line-through;color:#8b949e;':''}">${t.label}</div>
+      <div style="display:flex;gap:5px;">${avs}</div>
+    </div>`;
+  }).join('');
+}
+
+// ===== PACKING =====
+async function loadPkg() {
+  try {
+    const {data,error}=await db.from('packing_items').select('*').order('order_index').order('created_at');
+    if(error) throw error;
+    pkgs=data||[];
+  } catch(e){ console.warn('loadPkg:',e.message); }
+}
+
+async function seedPkg() {
+  try {
+    const items=DEFAULT_PKG.map((title,i)=>({title,order_index:i,dan_checked:false,kuba_checked:false,maciek_checked:false}));
+    await db.from('packing_items').insert(items);
+    await loadPkg();
+  } catch(e){ console.warn('seedPkg:',e); }
+}
+
+async function addItem() {
+  const inp=document.getElementById('newitem');
+  const title=inp.value.trim();
+  if(!title) return;
+  inp.value='';
+  try {
+    const {data}=await db.from('packing_items').insert({title,order_index:9999,dan_checked:false,kuba_checked:false,maciek_checked:false}).select();
+    if(data) pkgs.push(data[0]);
+    renderPack();
+  } catch(e){ console.warn('addItem:',e); }
+}
+
+async function togPkg(id) {
+  if(!me){alert('Wybierz najpierw swoje imię');return;}
+  const item=pkgs.find(i=>i.id===id);
+  if(!item) return;
+  const f=me+'_checked';
+  item[f]=!item[f];
+  renderPack();
+  try { await db.from('packing_items').update({[f]:item[f]}).eq('id',id); }
+  catch(e){ console.warn('togPkg:',e); }
+}
+
+async function delItem(id) {
+  pkgs=pkgs.filter(i=>i.id!==id);
+  renderPack();
+  try { await db.from('packing_items').delete().eq('id',id); }
+  catch(e){ console.warn('delItem:',e); }
+}
+
+function renderPack() {
+  const c=document.getElementById('packlist');
+  if(!c) return;
+  if(pkgs.length===0){
+    c.innerHTML='<div style="text-align:center;color:#8b949e;padding:40px 20px;">Brak przedmiotów. Dodaj pierwszy!</div>';
+    return;
+  }
+  c.innerHTML=pkgs.map(item=>{
+    const myOn=me&&item[me+'_checked'];
+    const avs=PS.map(p=>{
+      const on=item[p+'_checked'];
+      const isMe=p===me;
+      return `<div class="av${on?' on':''}${isMe?' me':''}"
+        style="${on?`--ac:${PC[p]};--abg:${PBG[p]};`:''}"
+        title="${PL[p]}"
+        onclick="${isMe?`togPkg('${item.id}')`:''}"
+        >${on?'✓':PL[p][0]}</div>`;
+    }).join('');
+    return `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
+      <div style="flex:1;font-size:14px;${myOn?'text-decoration:line-through;color:#8b949e;':''}">${item.title}</div>
+      <div style="display:flex;gap:5px;">${avs}</div>
+      <button onclick="delItem('${item.id}')" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:18px;padding:0 2px;line-height:1;" title="Usuń">×</button>
+    </div>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
