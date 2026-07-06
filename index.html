@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Highlands 2026 🏴󠁧󠁢󠁳󠁣󠁴󠁿</title>
+<title>Highlands 2026</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,11 +19,12 @@ details summary::-webkit-details-marker { display: none; }
 .br { background: #5e0d0d; color: #ff7b72; border: 1px solid #da3633; }
 .bo { background: #5a2800; color: #ffa657; border: 1px solid #db6d28; }
 .bgy { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
-.btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #30363d; background: #21262d; color: #e6edf3; cursor: pointer; font-size: 14px; font-weight: 500; transition: background .15s; }
+.btn { padding: 8px 14px; border-radius: 8px; border: 1px solid #30363d; background: #21262d; color: #e6edf3; cursor: pointer; font-size: 13px; font-weight: 500; transition: background .15s; display: inline-flex; align-items: center; gap: 6px; }
 .btn:hover { background: #30363d; }
 .btn-g { background: #196c2e; border-color: #238636; color: #56d364; }
-.btn-g:hover { background: #238636; }
-.av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; border: 2px solid #30363d; color: #8b949e; background: #21262d; user-select: none; flex-shrink: 0; }
+.btn-g:hover { background: #238636; color:#fff; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .15s; border: 2px solid #30363d; color: #8b949e; background: #21262d; user-select: none; flex-shrink: 0; }
 .av.on { border-color: var(--ac); color: var(--ac); background: var(--abg); }
 .av.me { box-shadow: 0 0 0 2px #58a6ff; }
 .stat-box { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; }
@@ -31,7 +32,7 @@ details summary::-webkit-details-marker { display: none; }
 .sl { font-size: 11px; color: #8b949e; margin-top: 2px; }
 nav { background: #161b22; border-bottom: 1px solid #30363d; overflow-x: auto; display: flex; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 nav::-webkit-scrollbar { display: none; }
-.tab { padding: 12px 18px; background: none; border: none; border-bottom: 2px solid transparent; color: #8b949e; cursor: pointer; font-size: 14px; font-weight: 600; white-space: nowrap; transition: all .15s; }
+.tab { padding: 12px 16px; background: none; border: none; border-bottom: 2px solid transparent; color: #8b949e; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; transition: all .15s; }
 .tab.on { color: #56d364; border-bottom-color: #56d364; }
 .tab:hover:not(.on) { color: #e6edf3; }
 .day-hdr { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 16px; gap: 12px; }
@@ -41,56 +42,67 @@ details[open] .chev { transform: rotate(180deg); }
 .ico { width: 22px; flex-shrink: 0; text-align: center; margin-top: 1px; }
 .ilbl { color: #8b949e; min-width: 88px; flex-shrink: 0; font-size: 13px; }
 .sh { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-input[type="text"] { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; color: #e6edf3; font-size: 14px; outline: none; }
-input[type="text"]:focus { border-color: #58a6ff; }
+input[type="text"], textarea { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; color: #e6edf3; font-size: 14px; outline: none; font-family: inherit; }
+input[type="text"]:focus, textarea:focus { border-color: #58a6ff; }
 .notebox { background: #2d1f00; border: 1px solid #db6d28; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #ffa657; margin-top: 10px; }
-.tt { font-size: 28px; font-weight: 800; }
+.tt { font-size: 26px; font-weight: 800; }
 .ts { font-size: 13px; color: #8b949e; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th { color: #8b949e; font-weight: 600; padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; }
+th { color: #8b949e; font-weight: 600; padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
 td { padding: 10px 12px; border-bottom: 1px solid #21262d; vertical-align: top; }
 tr:last-child td { border-bottom: none; }
-.modal-ov { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: flex; align-items: center; justify-content: center; }
-.modal { background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 32px; max-width: 380px; width: 92%; text-align: center; }
-.upick { width: 90px; height: 90px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; cursor: pointer; border: 2px solid #30363d; background: #21262d; color: #8b949e; transition: all .15s; }
+.modal-ov { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal { background: #161b22; border: 1px solid #30363d; border-radius: 16px; padding: 28px; max-width: 380px; width: 100%; text-align: center; }
+.upick { width: 90px; height: 90px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; cursor: pointer; border: 2px solid #30363d; background: #21262d; color: #8b949e; transition: all .15s; }
 .upick:hover { transform: scale(1.05); }
-@media(max-width:500px){.tt{font-size:22px;}.stat-box{padding:8px;}.sv{font-size:17px;}}
+[data-edit] { cursor: text; position: relative; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; transition: background .15s; }
+[data-edit]:hover { background: rgba(88,166,255,0.08); box-shadow: inset 0 0 0 1px rgba(88,166,255,0.2); }
+[data-edit].editing { background: #0d1117; box-shadow: inset 0 0 0 1px #58a6ff; outline: none; }
+.edit-hint { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 8px 14px; font-size: 12px; color: #8b949e; z-index: 50; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.edit-hint.show { opacity: 1; }
+.map-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.sight-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px; display: flex; gap: 12px; align-items: flex-start; }
+.sight-thumb { width: 60px; height: 60px; border-radius: 8px; background: #21262d; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
+.sight-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+@media(max-width:500px){.tt{font-size:22px;}.stat-box{padding:8px;}.sv{font-size:17px;}.tab{padding:10px 12px;font-size:12px;}}
 </style>
 </head>
 <body>
 
-<!-- User Modal -->
 <div id="umodal" class="modal-ov">
   <div class="modal">
     <div style="font-size:54px;margin-bottom:14px;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
     <h2 style="font-size:22px;font-weight:800;margin-bottom:8px;">Highlands 2026</h2>
-    <p style="color:#8b949e;font-size:14px;margin-bottom:28px;">Wybierz swoje imię, żeby śledzić postęp zadań i pakowania</p>
+    <p style="color:#8b949e;font-size:14px;margin-bottom:28px;">Wybierz swoje imię</p>
     <div style="display:flex;gap:12px;justify-content:center;">
-      <button class="upick" onclick="selUser('dan')" style="border-color:#238636;color:#56d364;background:#0d4a2e;">Dan</button>
+      <button class="upick" onclick="selUser('dan')" style="border-color:#238636;color:#56d364;background:#0d4a2e;">Michał</button>
       <button class="upick" onclick="selUser('kuba')" style="border-color:#1f6feb;color:#79c0ff;background:#0c2d6b;">Kuba</button>
       <button class="upick" onclick="selUser('maciek')" style="border-color:#8250df;color:#d2a8ff;background:#2d1f5e;">Maciek</button>
     </div>
   </div>
 </div>
 
-<!-- Header -->
-<div style="background:#161b22;border-bottom:1px solid #30363d;padding:13px 20px;position:sticky;top:0;z-index:99;">
-  <div style="max-width:920px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <span style="font-size:30px;line-height:1;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</span>
-      <div>
-        <div style="font-size:17px;font-weight:700;">Highlands 2026</div>
+<div style="background:#161b22;border-bottom:1px solid #30363d;padding:12px 20px;position:sticky;top:0;z-index:99;">
+  <div style="max-width:940px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+    <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+      <span style="font-size:28px;line-height:1;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</span>
+      <div style="min-width:0;">
+        <div style="font-size:16px;font-weight:700;">Highlands 2026</div>
         <div style="font-size:12px;color:#8b949e;">5–12 sierpnia · Inverness Loop · 533 km</div>
       </div>
     </div>
-    <button onclick="document.getElementById('umodal').style.display='flex'" id="ubadge" class="btn" style="font-size:13px;">👤 —</button>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button id="editToggle" class="btn btn-sm" onclick="toggleEdit()" title="Edytuj tekstowe pola">✏️</button>
+      <button onclick="document.getElementById('umodal').style.display='flex'" id="ubadge" class="btn btn-sm">👤 —</button>
+    </div>
   </div>
 </div>
 
-<!-- Nav -->
-<nav style="position:sticky;top:65px;z-index:98;">
-  <div style="max-width:920px;margin:0 auto;display:flex;">
+<nav style="position:sticky;top:63px;z-index:98;">
+  <div style="max-width:940px;margin:0 auto;display:flex;">
     <button class="tab on" onclick="goTab('plan',this)">📅 Plan</button>
+    <button class="tab" onclick="goTab('sights',this)">🏰 Zwiedzanie</button>
+    <button class="tab" onclick="goTab('flights',this)">✈️ Loty</button>
     <button class="tab" onclick="goTab('train',this)">🚂 Pociągi</button>
     <button class="tab" onclick="goTab('budget',this)">💰 Koszty</button>
     <button class="tab" onclick="goTab('tasks',this)">✅ Zadania</button>
@@ -98,19 +110,136 @@ tr:last-child td { border-bottom: none; }
   </div>
 </nav>
 
-<main style="max-width:920px;margin:0 auto;padding:20px 16px 80px;">
+<div id="editHint" class="edit-hint">Tryb edycji: kliknij tekst aby edytować · Enter aby zapisać · Esc aby anulować</div>
 
-<!-- PLAN -->
+<main style="max-width:940px;margin:0 auto;padding:20px 16px 80px;">
+
 <div id="tp"></div>
 
-<!-- TRAIN -->
+<div id="ts" style="display:none;">
+  <div class="sh">🏰 Zwiedzanie na trasie</div>
+  <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Ciekawe miejsca, zabytki i przystanki które warto odwiedzić na trasie. Kliknij nazwę aby przejść do źródła.</p>
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+    <select id="sightDayFilter" onchange="renderSights()" style="background:#21262d;border:1px solid #30363d;border-radius:8px;padding:8px 12px;color:#e6edf3;font-size:13px;">
+      <option value="all">Wszystkie dni</option>
+      <option value="1">Dzień 1 · 5.08 Edynburg</option>
+      <option value="2">Dzień 2 · 6.08 Fort Augustus</option>
+      <option value="3">Dzień 3 · 7.08 Ratagan</option>
+      <option value="4">Dzień 4 · 8.08 Achnasheen</option>
+      <option value="5">Dzień 5 · 9.08 Dundonnell</option>
+      <option value="6">Dzień 6 · 10.08 Bonar Bridge</option>
+      <option value="7">Dzień 7 · 11.08 Inverness</option>
+      <option value="8">Dzień 8 · 12.08 Edynburg</option>
+    </select>
+    <button class="btn btn-g btn-sm" onclick="openSightModal()">+ Dodaj miejsce</button>
+  </div>
+  <div id="sightsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+</div>
+
+<div id="tf" style="display:none;">
+  <div class="sh">✈️ Loty</div>
+  <div style="display:grid;gap:16px;margin-bottom:24px;">
+    <div class="card">
+      <div style="padding:14px 16px 0;display:flex;gap:8px;align-items:center;">
+        <span class="badge bg">Wylot</span>
+        <span style="font-size:13px;color:#8b949e;">środa 5 sierpnia · Ryanair FR 6123</span>
+      </div>
+      <div style="padding:16px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div><div class="tt">19:25</div><div class="ts">Gdańsk (GDN)</div></div>
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">2h 30m · bezpośredni</div>
+            <div style="height:2px;background:linear-gradient(to right,#238636,#56d364);border-radius:2px;"></div>
+          </div>
+          <div style="text-align:right;"><div class="tt">20:55</div><div class="ts">Edynburg (EDI)</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="padding:14px 16px 0;display:flex;gap:8px;align-items:center;">
+        <span class="badge bb">Powrót</span>
+        <span style="font-size:13px;color:#8b949e;">środa 12 sierpnia · Ryanair FR 6124</span>
+      </div>
+      <div style="padding:16px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div><div class="tt">21:20</div><div class="ts">Edynburg (EDI)</div></div>
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">2h 20m · bezpośredni</div>
+            <div style="height:2px;background:linear-gradient(to right,#1f6feb,#79c0ff);border-radius:2px;"></div>
+          </div>
+          <div style="text-align:right;"><div class="tt">00:40</div><div class="ts">Gdańsk (GDN)</div><div style="font-size:11px;color:#ffa657;">czwartek 13.08</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sh" style="margin-top:8px;">📦 Przewóz rowerów</div>
+  <p style="color:#8b949e;font-size:13px;margin-bottom:14px;">Do wyboru 3 opcje. Trzeba podjąć decyzję i zamówić / zarezerwować.</p>
+  <div style="display:flex;flex-direction:column;gap:12px;">
+
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
+        <div>
+          <div style="font-weight:700;font-size:15px;">Opcja 1 · Karton z Amazona</div>
+          <div style="font-size:12px;color:#8b949e;margin-top:2px;">Kup i wywieź — jednorazowe użycie</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:700;color:#56d364;font-size:16px;white-space:nowrap;">233,15 zł</div>
+          <div style="font-size:11px;color:#8b949e;">/ karton</div>
+        </div>
+      </div>
+      <div style="background:#21262d;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;">
+        Bikeflip — pudełko do transportu rowerów trekkingowych, kurierskiego
+      </div>
+      <a href="https://www.amazon.pl/Bikeflip-pudelko-transportu-trekkingowych-kurierskiego/dp/B0DVH7NYMF" target="_blank" rel="noopener" class="btn btn-sm">🔗 Amazon.pl</a>
+    </div>
+
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
+        <div>
+          <div style="font-weight:700;font-size:15px;">Opcja 2 · Wypożyczalnia Kowale</div>
+          <div style="font-size:12px;color:#8b949e;margin-top:2px;">Cycling Planet · Gdańsk-Kowale</div>
+        </div>
+      </div>
+      <div style="background:#21262d;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;">
+        Walizki rowerowe do wypożyczenia
+      </div>
+      <a href="https://cyclingplanet.pl/oferta/walizki-rowerowe/" target="_blank" rel="noopener" class="btn btn-sm">🔗 cyclingplanet.pl</a>
+    </div>
+
+    <div class="card" style="padding:16px;border-color:#238636;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
+        <div>
+          <div style="font-weight:700;font-size:15px;">Opcja 3 · Bike Atelier Kartuzy <span class="badge bg" style="margin-left:6px;">potwierdzone</span></div>
+          <div style="font-size:12px;color:#8b949e;margin-top:2px;">Michał: sklep@bikeatelier.pl · tel. +48 668 479 218</div>
+        </div>
+      </div>
+      <div style="background:#21262d;border-radius:8px;padding:12px;font-size:13px;line-height:1.6;margin-bottom:12px;">
+        <div style="margin-bottom:8px;">Dostępne 3 sztywne walizki <strong>Polaris Bike Pod Pro</strong> (rama karbon: dodatkowo zabezpieczyć pianką).</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12px;">
+          <div style="color:#8b949e;">Cena 1–7 dni:</div><div><strong>240 zł</strong> / walizka</div>
+          <div style="color:#8b949e;">Każdy kolejny dzień:</div><div>+20 zł</div>
+          <div style="color:#8b949e;">Kaucja:</div><div>800 zł / walizka</div>
+          <div style="color:#8b949e;">Zadatek rezerwacyjny:</div><div><strong>150 zł</strong> łącznie (50 zł × 3)</div>
+          <div style="color:#8b949e;">Termin (5–13.08):</div><div>9 dni = 240 + 2×20 = <strong>280 zł / walizka</strong></div>
+          <div style="color:#8b949e;">Razem 3 walizki:</div><div><strong style="color:#56d364;">840 zł</strong></div>
+        </div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid #30363d;color:#ffa657;">
+          ⚠️ Zadatek 150 zł wpłacić na konto Bike Atelier Kartuzy · <code>83 1020 2313 2920 0000 0000 0014</code> — max 3 dni od zapytania.
+        </div>
+      </div>
+      <a href="https://wypozyczalnia.bikeatelier.pl/" target="_blank" rel="noopener" class="btn btn-sm">🔗 Bike Atelier</a>
+    </div>
+
+  </div>
+</div>
+
 <div id="tt" style="display:none;">
   <div class="sh">🚂 Plan pociągów</div>
   <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;">
     🎫 Nr rezerwacji: <strong style="font-size:16px;letter-spacing:2px;color:#e6edf3;">KGNKTJWG</strong>
   </div>
   <div style="display:grid;gap:16px;">
-    <!-- Wyjazd -->
     <div class="card">
       <div style="padding:14px 16px 0;display:flex;gap:8px;align-items:center;">
         <span class="badge bg">Wyjazd</span>
@@ -120,13 +249,13 @@ tr:last-child td { border-bottom: none; }
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
           <div><div class="tt">10:33</div><div class="ts">Edinburgh Waverley</div></div>
           <div style="flex:1;text-align:center;">
-            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">3h 43m · ScotRail · bezpośredni</div>
+            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">3h 43m · ScotRail</div>
             <div style="height:2px;background:linear-gradient(to right,#238636,#56d364);border-radius:2px;"></div>
           </div>
           <div style="text-align:right;"><div class="tt">14:16</div><div class="ts">Inverness</div></div>
         </div>
         <div style="background:#21262d;border-radius:8px;padding:12px;">
-          <div style="font-size:12px;color:#8b949e;font-weight:600;margin-bottom:10px;">🪑 Zarezerwowane miejsca</div>
+          <div style="font-size:12px;color:#8b949e;font-weight:600;margin-bottom:10px;">🪑 Miejsca</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
             <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
               <div style="font-size:11px;color:#56d364;font-weight:600;">Michał</div>
@@ -145,12 +274,11 @@ tr:last-child td { border-bottom: none; }
             </div>
           </div>
           <div style="margin-top:10px;padding:8px 12px;background:#161b22;border-radius:6px;font-size:12px;color:#ffa657;">
-            🚲 Miejsca na rowery zarezerwowane — dowolna wolna przestrzeń na rowery
+            🚲 Miejsca na rowery zarezerwowane — dowolna wolna przestrzeń
           </div>
         </div>
       </div>
     </div>
-    <!-- Powrót -->
     <div class="card">
       <div style="padding:14px 16px 0;display:flex;gap:8px;align-items:center;">
         <span class="badge bb">Powrót</span>
@@ -160,13 +288,13 @@ tr:last-child td { border-bottom: none; }
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
           <div><div class="tt">18:52</div><div class="ts">Inverness</div></div>
           <div style="flex:1;text-align:center;">
-            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">3h 23m · ScotRail · bezpośredni</div>
+            <div style="font-size:12px;color:#8b949e;margin-bottom:4px;">3h 23m · ScotRail</div>
             <div style="height:2px;background:linear-gradient(to right,#1f6feb,#79c0ff);border-radius:2px;"></div>
           </div>
           <div style="text-align:right;"><div class="tt">22:15</div><div class="ts">Edinburgh Waverley</div></div>
         </div>
         <div style="background:#21262d;border-radius:8px;padding:12px;">
-          <div style="font-size:12px;color:#8b949e;font-weight:600;margin-bottom:10px;">🪑 Zarezerwowane miejsca</div>
+          <div style="font-size:12px;color:#8b949e;font-weight:600;margin-bottom:10px;">🪑 Miejsca</div>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
             <div style="background:#161b22;border-radius:8px;padding:10px;text-align:center;">
               <div style="font-size:11px;color:#56d364;font-weight:600;">Michał</div>
@@ -185,7 +313,7 @@ tr:last-child td { border-bottom: none; }
             </div>
           </div>
           <div style="margin-top:10px;padding:8px 12px;background:#161b22;border-radius:6px;font-size:12px;color:#ffa657;">
-            🚲 Miejsca na rowery zarezerwowane — dowolna wolna przestrzeń na rowery
+            🚲 Miejsca na rowery zarezerwowane — dowolna wolna przestrzeń
           </div>
         </div>
       </div>
@@ -193,14 +321,14 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
-<!-- BUDGET -->
 <div id="tb" style="display:none;">
   <div class="sh">💰 Kosztorys</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
-    <div class="stat-box"><div class="sv">4 938</div><div class="sl">PLN / osoba łącznie</div></div>
+    <div class="stat-box"><div class="sv">5 245</div><div class="sl">PLN / osoba łącznie</div></div>
     <div class="stat-box"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
     <div class="stat-box"><div class="sv">5 523</div><div class="sl">m przewyższenia</div></div>
   </div>
+
   <div class="card" style="margin-bottom:20px;">
     <div style="padding:14px 16px;border-bottom:1px solid #21262d;font-weight:700;font-size:15px;">Podział kosztów na osobę</div>
     <table>
@@ -209,45 +337,69 @@ tr:last-child td { border-bottom: none; }
         <tr><td>Noclegi na trasie</td><td style="text-align:right;color:#56d364;font-weight:600;">1 405 zł</td><td style="text-align:right;color:#8b949e;">4 214 zł</td></tr>
         <tr><td>Loty</td><td style="text-align:right;color:#56d364;font-weight:600;">1 159 zł</td><td style="text-align:right;color:#8b949e;">3 476 zł</td></tr>
         <tr><td>Pociąg tam i z powrotem</td><td style="text-align:right;color:#56d364;font-weight:600;">345 zł</td><td style="text-align:right;color:#8b949e;">1 036 zł</td></tr>
-        <tr><td>Taxi z lotniska (obie strony)</td><td style="text-align:right;color:#56d364;font-weight:600;">350 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
+        <tr><td>Chilly Winston z lotniska (5.08)</td><td style="text-align:right;color:#ffa657;font-weight:600;">~117 zł</td><td style="text-align:right;color:#8b949e;">70 GBP + 35 GBP uber</td></tr>
+        <tr><td>Chilly Winston do Edi (11.08)</td><td style="text-align:right;color:#ffa657;font-weight:600;">~117 zł</td><td style="text-align:right;color:#8b949e;">70 GBP</td></tr>
         <tr><td>2 noclegi w Edynburgu</td><td style="text-align:right;color:#56d364;font-weight:600;">0 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
-        <tr><td>Karton / pudło na rower</td><td style="text-align:right;color:#56d364;font-weight:600;">280 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
+        <tr><td>Karton / walizka na rower</td><td style="text-align:right;color:#ffa657;font-weight:600;">280 zł</td><td style="text-align:right;color:#8b949e;">840 zł*</td></tr>
         <tr><td>Jedzenie (50 GBP/os/dzień × 7 dni)</td><td style="text-align:right;color:#56d364;font-weight:600;">1 400 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
-        <tr style="font-weight:700;font-size:15px;"><td>RAZEM</td><td style="text-align:right;color:#ffa657;">4 938 zł</td><td style="text-align:right;"></td></tr>
+        <tr style="font-weight:700;font-size:15px;background:#0d1117;"><td>RAZEM</td><td style="text-align:right;color:#ffa657;">5 245 zł</td><td style="text-align:right;"></td></tr>
       </tbody>
     </table>
+    <div style="padding:10px 16px;font-size:11px;color:#8b949e;background:#0d1117;border-top:1px solid #21262d;">
+      * Bike Atelier Kartuzy — 3 walizki po 280 zł. Do wyboru też karton z Amazona (233 zł) lub Kowale.
+    </div>
   </div>
-  <div class="card">
+
+  <div class="card" style="margin-bottom:20px;">
     <div style="padding:14px 16px;border-bottom:1px solid #21262d;font-weight:700;font-size:15px;">Historia transakcji</div>
     <table>
       <thead><tr><th>Data</th><th>Opis</th><th style="text-align:right;">Total</th><th style="text-align:right;">/ osoba</th></tr></thead>
       <tbody>
-        <tr><td style="white-space:nowrap;">12.01</td><td>Loty + nocleg Achnaseen</td><td style="text-align:right;">4 160 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">1 387 zł</td></tr>
+        <tr><td style="white-space:nowrap;">12.01</td><td>Loty + nocleg Achnasheen</td><td style="text-align:right;">4 160 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">1 387 zł</td></tr>
         <tr><td style="white-space:nowrap;">13.01</td><td>Nocleg Ratagan</td><td style="text-align:right;">1 029 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">343 zł</td></tr>
         <tr><td style="white-space:nowrap;">17.01</td><td>Nocleg Dundonnell</td><td style="text-align:right;">1 049 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">350 zł</td></tr>
-        <tr><td style="white-space:nowrap;">5.07</td><td>Pociągi</td><td style="text-align:right;">1 036 zł</td><td style="text-align:right;color:#56d364;font-weight:600;">345 zł</td></tr>
+        <tr style="background:#1a1000;">
+          <td style="white-space:nowrap;color:#ffa657;">5.07</td>
+          <td>Pociągi <span style="color:#ff7b72;font-size:11px;">⚠️ Maciek nie oddał</span></td>
+          <td style="text-align:right;color:#ffa657;">1 036 zł</td>
+          <td style="text-align:right;color:#ffa657;font-weight:600;">345 zł</td>
+        </tr>
         <tr style="background:#1a1000;">
           <td style="white-space:nowrap;color:#ffa657;">do 2.08</td>
-          <td style="color:#ffa657;">Fort Augustus (Morag's Lodge)</td>
+          <td style="color:#ffa657;">Fort Augustus (Morag's Lodge) · niezapłacone</td>
           <td style="text-align:right;color:#ffa657;">606 zł</td>
           <td style="text-align:right;color:#ffa657;font-weight:600;">202 zł</td>
+        </tr>
+        <tr style="background:#1a1000;">
+          <td style="white-space:nowrap;color:#ffa657;">TBD</td>
+          <td style="color:#ffa657;">Karton/walizki · niezapłacone</td>
+          <td style="text-align:right;color:#ffa657;">840 zł</td>
+          <td style="text-align:right;color:#ffa657;font-weight:600;">280 zł</td>
+        </tr>
+        <tr style="background:#1a1000;">
+          <td style="white-space:nowrap;color:#ffa657;">TBD</td>
+          <td style="color:#ffa657;">Chilly Winston × 2 · niezapłacone</td>
+          <td style="text-align:right;color:#ffa657;">140 GBP</td>
+          <td style="text-align:right;color:#ffa657;font-weight:600;">~234 zł</td>
         </tr>
       </tbody>
     </table>
     <div style="padding:12px 16px;font-size:12px;color:#8b949e;background:#0d1117;border-top:1px solid #21262d;border-radius:0 0 12px 12px;">
-      💬 Kuba przelał ✓ &nbsp;·&nbsp; Maciek przelał ✓ &nbsp;(wszystkie dotychczasowe transakcje)
+      💬 12.01 · 13.01 · 17.01 — Kuba i Maciek przelali · 5.07 pociągi — Kuba przelał, Maciek nie oddał
     </div>
   </div>
 </div>
 
-<!-- TASKS -->
 <div id="tts" style="display:none;">
   <div class="sh">✅ Zadania przed wyjazdem</div>
-  <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Każdy odznacza swoje zadania. Kliknij swój avatar żeby zmienić status.</p>
+  <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Każdy odznacza swoje zadania. Możesz dodawać nowe.</p>
+  <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <input type="text" id="newtask" placeholder="Dodaj nowe zadanie..." style="flex:1;" onkeydown="if(event.key==='Enter')addTask()">
+    <button class="btn btn-g" onclick="addTask()">+ Dodaj</button>
+  </div>
   <div id="tasklist" style="display:flex;flex-direction:column;gap:10px;"></div>
 </div>
 
-<!-- PACKING -->
 <div id="tpk" style="display:none;">
   <div class="sh">🎒 Lista pakunkowa</div>
   <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Zaznacz co już spakowałeś. Możesz dodawać i usuwać rzeczy.</p>
@@ -260,6 +412,33 @@ tr:last-child td { border-bottom: none; }
 
 </main>
 
+<div id="sightModal" class="modal-ov" style="display:none;">
+  <div class="modal" style="max-width:440px;text-align:left;">
+    <h3 style="font-size:18px;font-weight:700;margin-bottom:16px;">🏰 Dodaj miejsce do zwiedzania</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <select id="smDay" style="background:#21262d;border:1px solid #30363d;border-radius:8px;padding:8px 12px;color:#e6edf3;font-size:14px;">
+        <option value="1">Dzień 1 · 5.08 Edynburg</option>
+        <option value="2">Dzień 2 · 6.08 Fort Augustus</option>
+        <option value="3">Dzień 3 · 7.08 Ratagan</option>
+        <option value="4">Dzień 4 · 8.08 Achnasheen</option>
+        <option value="5">Dzień 5 · 9.08 Dundonnell</option>
+        <option value="6">Dzień 6 · 10.08 Bonar Bridge</option>
+        <option value="7">Dzień 7 · 11.08 Inverness</option>
+        <option value="8">Dzień 8 · 12.08 Edynburg</option>
+      </select>
+      <input type="text" id="smName" placeholder="Nazwa (np. Eilean Donan Castle)">
+      <input type="text" id="smIcon" placeholder="Emoji (np. 🏰)" maxlength="4">
+      <textarea id="smDesc" placeholder="Krótki opis (1-3 zdania)" rows="3"></textarea>
+      <input type="text" id="smUrl" placeholder="Link do źródła (Wikipedia, oficjalna strona)">
+      <input type="text" id="smImg" placeholder="URL do zdjęcia (opcjonalne)">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button class="btn" onclick="closeSightModal()">Anuluj</button>
+      <button class="btn btn-g" onclick="saveSight()">Zapisz</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SB_URL = 'https://axbgkvswfzsrvtvjrskh.supabase.co';
 const SB_KEY = 'sb_publishable_fLytrxqd7-8T79l-YA9xig_ZAw7c2oN';
@@ -268,118 +447,26 @@ const db = supabase.createClient(SB_URL, SB_KEY);
 let me = localStorage.getItem('hlds_user');
 let chk = {};
 let pkgs = [];
+let tasks = [];
+let sights = [];
+let content = {};
+let editMode = false;
 
 const PS = ['dan','kuba','maciek'];
 const PL = {dan:'Michał',kuba:'Kuba',maciek:'Maciek'};
 const PC = {dan:'#56d364',kuba:'#79c0ff',maciek:'#d2a8ff'};
 const PBG = {dan:'#0d4a2e',kuba:'#0c2d6b',maciek:'#2d1f5e'};
 
-const TASKS = [
-  {id:'jedzenie',  label:'Obliczyć i zaplanować jedzenie na trasę',            icon:'🍌'},
-  {id:'transport', label:'Załatwić transport z lotniska (w obie strony)',        icon:'🚕'},
-  {id:'gpx',       label:'Wygenerować pliki GPX dla każdego etapu',             icon:'🗺️'},
-  {id:'karton',    label:'Zamówić / zorganizować karton na rower',               icon:'📦'},
-  {id:'serwis',    label:'Serwis rowerowy przed wyjazdem',                       icon:'🔧'},
-  {id:'ubezp',     label:'Ubezpieczenie podróżne',                               icon:'🛡️'},
-  {id:'mapy',      label:'Ściągnąć mapy offline (Mapy.cz / Komoot)',             icon:'📱'},
-  {id:'pociag',    label:'Pociąg do/z Edynburga — bilety krajowe',              icon:'🚆'},
-  {id:'eta',       label:'Aktywować kartę / zabrać GBP w gotówce',              icon:'💳'},
-];
-
-const DAYS = [
-  {
-    date:'5.08',dow:'środa',ico:'✈️',
-    title:'Przylot — Edynburg',
-    desc:'Przylot wieczorem. Nocleg u dziewczyn w Musselburgh.',
-    km:null,el:null,map:null,acc:null,rest:null,shop:null,note:null,
-  },
-  {
-    date:'6.08',dow:'czwartek',ico:'🚂',
-    title:'Edynburg → Fort Augustus',
-    desc:'Pociąg Edinburgh Waverley → Inverness (10:33–14:16), po południu ruszamy na trasę.',
-    km:56.9,el:585,map:'https://mapy.com/s/dozovegege',
-    acc:{name:"Morag's Lodge",
-         url:'https://www.booking.com/hotel/gb/morag-s-lodge.en-gb.html',
-         cost:'606 zł',pay:'Pay nothing until 2 August 2026',
-         cancel:'Free cancellation before 4 August 2026',
-         breakfast:'32 zł / osoba'},
-    rest:"Highland Hideout (8pm) · Beaufort House PIZZA (8:30pm)",
-    shop:'Spar — centrum Fort Augustus',
-    note:null,
-  },
-  {
-    date:'7.08',dow:'piątek',ico:'🚵',
-    title:'Fort Augustus → Ratagan',
-    desc:'Dzień 2. Przez Great Glen i Glen Shiel.',
-    km:103,el:1119,map:'https://mapy.com/s/mufalaluko',
-    acc:{name:'Ratagan Youth Hostel (SYHA)',
-         url:'https://www.booking.com/hotel/gb/ratagan-youth-hostel-syha-hostelling-scotland.en-gb.html',
-         cost:'1 029 zł',pay:'zapłacone',
-         cancel:'Free cancellation before 4 August 2026',
-         breakfast:'32 zł / osoba'},
-    rest:'Kintail Lodge Hotel (8pm, rezerwacja?) · The Pitstop at Kintail',
-    shop:"Eilean Donan Visitor's Centre w Dornie",
-    note:null,
-  },
-  {
-    date:'8.08',dow:'sobota',ico:'🚵',
-    title:'Ratagan → Achnaseen',
-    desc:'Dzień 3. Przez Torridon.',
-    km:88,el:1160,map:'https://mapy.com/s/hepezubulo',
-    acc:{name:'Ledgowan Bunkhouse',
-         url:'https://www.booking.com/hotel/gb/ledgowan-bunkhouse.en-gb.html',
-         cost:'684 zł',pay:'zapłacone',
-         cancel:'⚠️ BRAK możliwości odwołania',
-         breakfast:'The Midge Bite Cafe Achnasheen'},
-    rest:'Kinlochewe Hotel — The Stag Highland Restaurant',
-    shop:'Poolewe — Mace',
-    note:'⚠️ Trzeba kupić śpiwór za 10 GBP na miejscu. Brak śniadania i kolacji w cenie noclegu.',
-  },
-  {
-    date:'9.08',dow:'niedziela',ico:'🚵',
-    title:'Achnaseen → Dundonnell',
-    desc:'Dzień 4. Największe przewyższenie całej trasy.',
-    km:93,el:1183,map:'https://mapy.com/s/mebemahuda',
-    acc:{name:'The Dundonnell Hotel',
-         url:'https://www.booking.com/hotel/gb/the-dundonnell.en-gb.html',
-         cost:'1 044 zł',pay:'zapłacone',
-         cancel:'Free cancellation before 7 August 2026',
-         breakfast:'w cenie'},
-    rest:'Kolacja w hotelu (18:00–20:00)',
-    shop:'Ullapool — Tesco',
-    note:null,
-  },
-  {
-    date:'10.08',dow:'poniedziałek',ico:'🚵',
-    title:'Dundonnell → Bonar Bridge',
-    desc:'Dzień 5.',
-    km:90,el:996,map:'https://mapy.com/s/lufevaraku',
-    acc:{name:'Dunroamin Hotel',
-         url:'https://www.booking.com/hotel/gb/dunroamin-hotel.en-gb.html',
-         cost:'851 zł',pay:'zapłacone',
-         cancel:'Bezpłatne odwołanie do 2 August 2026 23:59',
-         breakfast:'w cenie'},
-    rest:'Kolacja w hotelu',
-    shop:'Spar — centrum Bonar Bridge',
-    note:null,
-  },
-  {
-    date:'11.08',dow:'wtorek',ico:'🏁',
-    title:'Bonar Bridge → Inverness → Edynburg',
-    desc:'Dzień 6 — ostatni etap. Pociąg powrotny z Inverness (18:52–22:15).',
-    km:102.5,el:680,map:'https://mapy.com/s/letosucefu',
-    acc:{name:'Nocleg u dziewczyn w Musselburgh',url:null,cost:null,pay:null,cancel:null,breakfast:null},
-    rest:'Coś w Inverness przed pociągiem',
-    shop:null,
-    note:'🚂 Pociąg: Inverness 18:52 → Edinburgh Waverley 22:15 (wagon B)',
-  },
-  {
-    date:'12.08',dow:'środa',ico:'🏙️',
-    title:'Edynburg — zwiedzanie',
-    desc:'Ostatni dzień. Wylot o 21:40.',
-    km:null,el:null,map:null,acc:null,rest:null,shop:null,
-    note:'✈️ Wylot: 21:40',
-  },
+const DEFAULT_TASKS = [
+  {title:'Obliczyć i zaplanować jedzenie na trasę', icon:'🍌'},
+  {title:'Załatwić transport z lotniska (Chilly Winston + Uber)', icon:'🚕'},
+  {title:'Wygenerować pliki GPX dla każdego etapu', icon:'🗺️'},
+  {title:'Zamówić / zorganizować karton lub walizkę', icon:'📦'},
+  {title:'Serwis rowerowy przed wyjazdem', icon:'🔧'},
+  {title:'Ubezpieczenie podróżne', icon:'🛡️'},
+  {title:'Ściągnąć mapy offline (Mapy.cz / Komoot)', icon:'📱'},
+  {title:'Pociąg do/z Edynburga — bilety krajowe', icon:'🚆'},
+  {title:'Aktywować kartę / zabrać GBP w gotówce', icon:'💳'},
 ];
 
 const DEFAULT_PKG = [
@@ -388,25 +475,191 @@ const DEFAULT_PKG = [
   'Kurtka przeciwdeszczowa','Spodnie rowerowe (×2)','Koszulka rowerowa (×2)',
   'Skarpety (×3)','Bielizna (×3)','Koszulka na wieczór','Bluza / midlayer',
   'Kask','Buty rowerowe','Rękawiczki rowerowe','Okulary / gogle',
-  'Krem z filtrem UV','Spray na meszki 🦟 (BARDZO ważny w Szkocji!)',
-  'Powerbank','Ładowarka + adapter UK 🔌','Telefon z mapami offline',
+  'Krem z filtrem UV','Spray na meszki (BARDZO ważny w Szkocji!)',
+  'Powerbank','Ładowarka + adapter UK','Telefon z mapami offline',
   'Dowód osobisty / paszport','Karta + GBP w gotówce',
   'Leki (podstawowe)','Apteczka','Ręcznik',
   'Przybory toaletowe (mini)','Śpiwór (Ledgowan Bunkhouse pobiera 10 GBP za wypożyczenie)',
   'Kłódka do roweru','Sakwy / torby na rower','Odblask + światełka',
 ];
 
+const DEFAULT_SIGHTS = [
+  // Dzień 1 - Edynburg
+  {day:1,name:'Musselburgh',icon:'🏘️',desc:'Nadmorska miejscowość pod Edynburgiem, gdzie nocujemy pierwszej i przedostatniej nocy.',url:'https://en.wikipedia.org/wiki/Musselburgh'},
+  // Dzień 2 - Inverness i Fort Augustus
+  {day:2,name:'Inverness Castle',icon:'🏰',desc:'XIX-wieczny zamek w centrum Inverness, tuż nad rzeką Ness. Punkt widokowy.',url:'https://en.wikipedia.org/wiki/Inverness_Castle'},
+  {day:2,name:'Loch Ness',icon:'🐉',desc:'Najsłynniejsze jezioro Szkocji — 37 km długości, głębokie na 230 m. Legendarna Nessie.',url:'https://en.wikipedia.org/wiki/Loch_Ness'},
+  {day:2,name:'Urquhart Castle',icon:'🏰',desc:'Ruiny zamku nad Loch Ness z XIII wieku — jedno z najczęściej odwiedzanych miejsc w Szkocji.',url:'https://en.wikipedia.org/wiki/Urquhart_Castle'},
+  {day:2,name:'Caledonian Canal (Fort Augustus)',icon:'⛵',desc:'System 5 śluz w Fort Augustus, łączący Loch Ness z Loch Oich. Widowiskowe przejścia jachtów.',url:'https://en.wikipedia.org/wiki/Caledonian_Canal'},
+  // Dzień 3 - Fort Augustus → Ratagan (Great Glen, Glen Shiel)
+  {day:3,name:'Loch Oich & Loch Lochy',icon:'🏞️',desc:'Dwa jeziora w Great Glen — droga wiedzie ich brzegami. Bardzo malowniczo.',url:'https://en.wikipedia.org/wiki/Loch_Oich'},
+  {day:3,name:'Well of the Seven Heads',icon:'💀',desc:'Ponury pomnik z 1812 r. — upamiętnia zemstę za morderstwo dokonane na członkach klanu MacDonell w 1663 r.',url:'https://en.wikipedia.org/wiki/Well_of_the_Seven_Heads'},
+  {day:3,name:'Glen Shiel',icon:'⛰️',desc:'Dramatyczna dolina — miejsce bitwy z 1719 r. Otoczona pięcioma szczytami "Five Sisters of Kintail".',url:'https://en.wikipedia.org/wiki/Battle_of_Glen_Shiel'},
+  // Dzień 4 - Ratagan → Achnasheen
+  {day:4,name:'Eilean Donan Castle',icon:'🏰',desc:'IKONA Szkocji. XIII-wieczny zamek na wyspie w miejscu spotkania trzech jezior morskich. Absolutny must-see.',url:'https://www.eileandonancastle.com/'},
+  {day:4,name:'Five Sisters of Kintail',icon:'⛰️',desc:'Ostry, pięcioszczytowy grzbiet górski nad Glen Shiel. Klasyka Munro-baggingu.',url:'https://en.wikipedia.org/wiki/Five_Sisters_of_Kintail'},
+  {day:4,name:'Plockton',icon:'🐬',desc:'Malownicza rybacka wioska z palmami (dzięki Golfstromowi). Nazywana "Perłą Highlands".',url:'https://en.wikipedia.org/wiki/Plockton'},
+  {day:4,name:'Torridon Hills',icon:'⛰️',desc:'Jeden z najbardziej ikonicznych regionów górskich Szkocji — piaskowce, ostre grzbiety, prehistoryczny krajobraz.',url:'https://en.wikipedia.org/wiki/Torridon'},
+  // Dzień 5 - Achnasheen → Dundonnell
+  {day:5,name:'Beinn Eighe National Nature Reserve',icon:'🌲',desc:'Pierwszy rezerwat przyrody Wielkiej Brytanii (1951). Reliktowy sosnowy las kaledoński.',url:'https://en.wikipedia.org/wiki/Beinn_Eighe'},
+  {day:5,name:'Loch Maree',icon:'🏞️',desc:'Jedno z najpiękniejszych jezior Szkocji — z wyspami porośniętymi starą sosną. Ulubione miejsce Queen Victorii.',url:'https://en.wikipedia.org/wiki/Loch_Maree'},
+  {day:5,name:'Inverewe Garden (Poolewe)',icon:'🌺',desc:'Subtropikalny ogród botaniczny nad brzegiem morza — możliwy dzięki Golfstromowi.',url:'https://www.nts.org.uk/visit/places/inverewe'},
+  {day:5,name:'Corrieshalloch Gorge',icon:'💦',desc:'Wąwóz i wodospad Falls of Measach (46 m). Wiszący most przez przepaść.',url:'https://en.wikipedia.org/wiki/Corrieshalloch_Gorge'},
+  {day:5,name:'An Teallach',icon:'⛰️',desc:'"Kuźnia" — jedna z najsłynniejszych i najbardziej dramatycznych gór Szkocji. Widać ją z drogi nad Little Loch Broom.',url:'https://en.wikipedia.org/wiki/An_Teallach'},
+  {day:5,name:'Ullapool',icon:'⚓',desc:'Rybacki port nad Loch Broom — jeden z najładniejszych na zachodnim wybrzeżu. Świetne miejsce na kolację (na trasie następnego dnia).',url:'https://en.wikipedia.org/wiki/Ullapool'},
+  // Dzień 6 - Dundonnell → Bonar Bridge
+  {day:6,name:'Ardvreck Castle',icon:'🏰',desc:'Ruina XVI-wiecznego zamku na cyplu Loch Assynt. Klimatyczne, choć trochę zbaczające z trasy.',url:'https://en.wikipedia.org/wiki/Ardvreck_Castle'},
+  {day:6,name:'Falls of Shin',icon:'🐟',desc:'Wodospad znany ze skaczącego łososia (VIII–IX). Dobre miejsce na przerwę.',url:'https://en.wikipedia.org/wiki/Falls_of_Shin'},
+  {day:6,name:'Carbisdale Castle',icon:'🏰',desc:'"Zamek Ślubny" — XX-wieczny gmach nad Kyle of Sutherland. Dobrze widoczny z drogi.',url:'https://en.wikipedia.org/wiki/Carbisdale_Castle'},
+  // Dzień 7 - Bonar Bridge → Inverness
+  {day:7,name:'Dornoch Firth',icon:'🌊',desc:'Malowniczy fiord po drodze — bogaty w foki i ptactwo morskie.',url:'https://en.wikipedia.org/wiki/Dornoch_Firth'},
+  {day:7,name:'Struie Hill (widok)',icon:'👁️',desc:'Punkt widokowy Struie na Dornoch Firth i Ben Wyvis — jeden z najbardziej klasycznych widoków Highlands.',url:'https://www.walkhighlands.co.uk/'},
+  {day:7,name:'Culloden Battlefield',icon:'⚔️',desc:'Miejsce bitwy z 1746 r. — koniec powstania jakobickiego. Jeśli będzie czas przed pociągiem.',url:'https://www.nts.org.uk/visit/places/culloden'},
+  // Dzień 8 - Edynburg
+  {day:8,name:'Edinburgh Castle',icon:'🏰',desc:'Zamek na skale wulkanicznej w sercu miasta. Codzienny wystrzał armaty o 13:00 (poza niedzielą).',url:'https://www.edinburghcastle.scot/'},
+  {day:8,name:'Royal Mile',icon:'🚶',desc:'Główna ulica Starówki — od zamku do pałacu Holyrood. Muzea, puby, sklepy z whisky.',url:'https://en.wikipedia.org/wiki/Royal_Mile'},
+  {day:8,name:"Arthur's Seat",icon:'🗻',desc:'Wygasły wulkan w centrum miasta (251 m). Krótkie podejście z fenomenalnym widokiem.',url:'https://en.wikipedia.org/wiki/Arthur%27s_Seat'},
+  {day:8,name:'Calton Hill',icon:'🏛️',desc:'Kolumnowy pomnik "Athens of the North" + widok na Old Town i Firth of Forth. 10 min podejścia.',url:'https://en.wikipedia.org/wiki/Calton_Hill'},
+  {day:8,name:'National Museum of Scotland',icon:'🏛️',desc:'Wielkie muzeum — od dinozaurów po współczesną Szkocję. Wstęp bezpłatny.',url:'https://www.nms.ac.uk/national-museum-of-scotland/'},
+];
+
+const DAYS = [
+  {
+    day:1,date:'5.08',dow:'środa',ico:'✈️',
+    title:'Przylot — Edynburg',
+    desc:'Ryanair FR 6123 Gdańsk → Edynburg (19:25–20:55). Chilly Winston odbiera nas z lotniska o 21:30 (Van). Nocleg u dziewczyn w Musselburgh.',
+    km:null,el:null,mapEmbed:null,mapFull:null,gpx:null,
+    acc:{name:'Nocleg u dziewczyn w Musselburgh',url:null,cost:null,pay:null,cancel:null,breakfast:null},
+    rest:null,restUrl:null,shop:null,
+    notes:'🚕 Chilly Winston 21:30 (70 GBP) — 1 osoba jedzie z rowerami vanem, 2 pozostałe Uberem (~35 GBP). Łącznie ~105 GBP.',
+  },
+  {
+    day:2,date:'6.08',dow:'czwartek',ico:'🚂',
+    title:'Edynburg → Fort Augustus',
+    desc:'Pociąg Edinburgh Waverley → Inverness (10:33–14:16), po południu ruszamy na trasę.',
+    km:56.9,el:585,
+    mapEmbed:'https://mapy.com/s/dozovegege',mapFull:'https://mapy.com/s/nugezodeva',
+    gpx:'gpx/day1-inverness-fort-augustus.gpx',
+    acc:{name:"Morag's Lodge",
+         url:'https://www.booking.com/hotel/gb/morag-s-lodge.en-gb.html',
+         cost:'606 zł',pay:'Pay nothing until 2 August 2026',
+         cancel:'Free cancellation before 4 August 2026',
+         breakfast:'32 zł / osoba'},
+    rest:'Highland Hideout (8pm) · Beaufort House PIZZA (8:30pm)',
+    restUrl:'https://maps.app.goo.gl/ZhBdxHWQx87woLRL7',
+    shop:null,
+    notes:null,
+  },
+  {
+    day:3,date:'7.08',dow:'piątek',ico:'🚵',
+    title:'Fort Augustus → Ratagan',
+    desc:'Dzień 2. Przez Great Glen i Glen Shiel.',
+    km:103,el:1119,
+    mapEmbed:'https://mapy.com/s/mufalaluko',mapFull:'https://mapy.com/s/damahataba',
+    gpx:'gpx/day2-fort-augustus-ratagan.gpx',
+    acc:{name:'Ratagan Youth Hostel (SYHA)',
+         url:'https://www.booking.com/hotel/gb/ratagan-youth-hostel-syha-hostelling-scotland.en-gb.html',
+         cost:'1 029 zł',pay:'zapłacone',
+         cancel:'Free cancellation before 4 August 2026',
+         breakfast:'32 zł / osoba'},
+    rest:'Kintail Lodge Hotel (8pm, rezerwacja?) · The Pitstop at Kintail',
+    restUrl:'https://www.google.com/maps/place/Kintail+Lodge+Hotel/@57.2218158,-5.4246986,16.76z',
+    shop:'Spar — centrum Fort Augustus (przed wyjazdem rano)',
+    notes:null,
+  },
+  {
+    day:4,date:'8.08',dow:'sobota',ico:'🚵',
+    title:'Ratagan → Achnasheen',
+    desc:'Dzień 3. Przez Kyle of Lochalsh i Torridon.',
+    km:88,el:1160,
+    mapEmbed:'https://mapy.com/s/hepezubulo',mapFull:'https://mapy.com/s/fatezorasu',
+    gpx:'gpx/day3-ratagan-achnasheen.gpx',
+    acc:{name:'Ledgowan Bunkhouse',
+         url:'https://www.booking.com/hotel/gb/ledgowan-bunkhouse.en-gb.html',
+         cost:'684 zł',pay:'zapłacone',
+         cancel:'⚠️ BRAK możliwości odwołania',
+         breakfast:'The Midge Bite Cafe Achnasheen',
+         breakfastUrl:'https://maps.app.goo.gl/F22VUNe5EE8Rg2ba7'},
+    rest:'Kinlochewe Hotel — The Stag Highland Restaurant',
+    restUrl:'https://maps.app.goo.gl/chc1V8kXPWVFsGRz6',
+    shop:'Eilean Donan Visitor\'s Centre w Dornie (po drodze)',
+    notes:'⚠️ Trzeba kupić śpiwór za 10 GBP na miejscu. Brak śniadania i kolacji w cenie noclegu.',
+  },
+  {
+    day:5,date:'9.08',dow:'niedziela',ico:'🚵',
+    title:'Achnasheen → Dundonnell',
+    desc:'Dzień 4. Największe przewyższenie całej trasy. Przez Poolewe i Loch Maree.',
+    km:93,el:1183,
+    mapEmbed:'https://mapy.com/s/mebemahuda',mapFull:'https://mapy.com/s/rakavezuru',
+    gpx:'gpx/day4-achnasheen-dundonnell.gpx',
+    acc:{name:'The Dundonnell Hotel',
+         url:'https://www.booking.com/hotel/gb/the-dundonnell.en-gb.html',
+         cost:'1 044 zł',pay:'zapłacone',
+         cancel:'Free cancellation before 7 August 2026',
+         breakfast:'w cenie'},
+    rest:'Kolacja w hotelu (18:00–20:00)',
+    restUrl:null,
+    shop:'Poolewe — Mace (po drodze)',
+    notes:null,
+  },
+  {
+    day:6,date:'10.08',dow:'poniedziałek',ico:'🚵',
+    title:'Dundonnell → Bonar Bridge',
+    desc:'Dzień 5. Przez Corrieshalloch Gorge i Ullapool.',
+    km:90,el:996,
+    mapEmbed:'https://mapy.com/s/lufevaraku',mapFull:'https://mapy.com/s/dugulanolo',
+    gpx:'gpx/day5-dundonnell-bonar-bridge.gpx',
+    acc:{name:'Dunroamin Hotel',
+         url:'https://www.booking.com/hotel/gb/dunroamin-hotel.en-gb.html',
+         cost:'851 zł',pay:'zapłacone',
+         cancel:'Bezpłatne odwołanie do 2 August 2026 23:59',
+         breakfast:'w cenie'},
+    rest:'Kolacja w hotelu',
+    restUrl:null,
+    shop:'Ullapool — Tesco (po drodze)',
+    notes:null,
+  },
+  {
+    day:7,date:'11.08',dow:'wtorek',ico:'🏁',
+    title:'Bonar Bridge → Inverness → Edynburg',
+    desc:'Dzień 6 — ostatni etap. Pociąg powrotny z Inverness (18:52–22:15).',
+    km:102.5,el:680,
+    mapEmbed:'https://mapy.com/s/letosucefu',mapFull:'https://mapy.com/s/moduhonuto',
+    gpx:'gpx/day6-bonar-bridge-inverness.gpx',
+    acc:{name:'Nocleg u dziewczyn w Musselburgh',url:null,cost:null,pay:null,cancel:null,breakfast:null},
+    rest:'Coś w Inverness przed pociągiem',
+    restUrl:null,
+    shop:'Spar — centrum Bonar Bridge (przed wyjazdem rano)',
+    notes:'🚂 Pociąg: Inverness 18:52 → Edinburgh Waverley 22:15 (wagon B).\n🚕 Chilly Winston odbiera rowery z Musselburgh o 19:00 (70 GBP) i wiezie na lotnisko.',
+  },
+  {
+    day:8,date:'12.08',dow:'środa',ico:'🏙️',
+    title:'Edynburg — zwiedzanie',
+    desc:'Ostatni dzień. Ryanair FR 6124 Edynburg → Gdańsk (21:20 → 00:40 w czwartek).',
+    km:null,el:null,mapEmbed:null,mapFull:null,gpx:null,
+    acc:null,rest:null,restUrl:null,shop:null,
+    notes:'✈️ Wylot: 21:20 z Edynburga.',
+  },
+];
+
 // ===== INIT =====
 async function init() {
   if (!me) { document.getElementById('umodal').style.display='flex'; }
   else { document.getElementById('umodal').style.display='none'; updBadge(); }
+  await loadContent();
   renderPlan();
-  await loadChk();
+  await loadTasks(); if (tasks.length===0) await seedTasks();
   renderTasks();
-  await loadPkg();
-  if (pkgs.length===0) await seedPkg();
+  await loadPkg(); if (pkgs.length===0) await seedPkg();
   renderPack();
-  setInterval(async()=>{ await loadChk(); renderTasks(); await loadPkg(); renderPack(); }, 30000);
+  await loadSights(); if (sights.length===0) await seedSights();
+  renderSights();
+  setInterval(async()=>{
+    await loadTasks(); renderTasks();
+    await loadPkg(); renderPack();
+    await loadSights(); renderSights();
+    await loadContent(); applyContent();
+  }, 30000);
 }
 
 function selUser(u) {
@@ -423,19 +676,69 @@ function updBadge() {
 
 // ===== TABS =====
 function goTab(name, btn) {
-  ['tp','tt','tb','tts','tpk'].forEach(id=>document.getElementById(id).style.display='none');
-  const map={plan:'tp',train:'tt',budget:'tb',tasks:'tts',packing:'tpk'};
+  const map={plan:'tp',sights:'ts',flights:'tf',train:'tt',budget:'tb',tasks:'tts',packing:'tpk'};
+  Object.values(map).forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById(map[name]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ===== CONTENT (editable overrides) =====
+async function loadContent() {
+  try {
+    const {data,error}=await db.from('content').select('*');
+    if(error) throw error;
+    content={};
+    (data||[]).forEach(r=>{content[r.id]=r.value;});
+  } catch(e){ console.warn('loadContent:',e.message); }
+}
+function ov(key, fallback){ return content[key]!==undefined ? content[key] : fallback; }
+function applyContent() {
+  document.querySelectorAll('[data-edit]').forEach(el=>{
+    const k=el.getAttribute('data-edit');
+    if(content[k]!==undefined) el.textContent=content[k];
+  });
+}
+async function saveField(key, value) {
+  content[key]=value;
+  try { await db.from('content').upsert({id:key,value:value,updated_at:new Date().toISOString()}); }
+  catch(e){ console.warn('saveField:',e); }
+}
+
+function toggleEdit() {
+  editMode=!editMode;
+  document.getElementById('editToggle').style.background = editMode ? '#238636' : '';
+  document.getElementById('editToggle').style.color = editMode ? '#fff' : '';
+  document.getElementById('editHint').classList.toggle('show', editMode);
+  document.querySelectorAll('[data-edit]').forEach(el=>{
+    el.setAttribute('contenteditable', editMode ? 'true' : 'false');
+    if(editMode){
+      el.onblur = async ()=>{
+        el.classList.remove('editing');
+        const key=el.getAttribute('data-edit');
+        const val=el.textContent.trim();
+        await saveField(key,val);
+      };
+      el.onfocus = ()=> el.classList.add('editing');
+      el.onkeydown = e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); el.blur(); } if(e.key==='Escape'){ el.blur(); } };
+    } else {
+      el.classList.remove('editing');
+      el.onblur=null; el.onfocus=null; el.onkeydown=null;
+    }
+  });
 }
 
 // ===== PLAN =====
 function renderPlan() {
   document.getElementById('tp').innerHTML = DAYS.map((d,i)=>dayCard(d,i)).join('');
+  applyContent();
 }
 
-function dayCard(d, i) {
+function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function ed(key, text){ return `<span data-edit="${key}">${esc(text||'')}</span>`; }
+
+function dayCard(d, idx) {
   const stats = d.km ? `
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
       <span class="badge bg">🚴 ${d.km} km</span>
@@ -444,35 +747,95 @@ function dayCard(d, i) {
 
   let body = '';
 
-  if (d.map) {
+  // Mapa + buttony
+  if (d.mapEmbed) {
     body += `<div style="margin-bottom:12px;">
-      <iframe src="${d.map}" style="width:100%;height:260px;border-radius:8px;border:none;" loading="lazy" allowfullscreen></iframe>
+      <div class="map-row">
+        ${d.mapFull ? `<a href="${d.mapFull}" target="_blank" rel="noopener" class="btn btn-sm">🗺️ Otwórz w Mapy.cz</a>` : ''}
+        ${d.gpx ? `<a href="${d.gpx}" download class="btn btn-sm btn-g">⬇️ Pobierz GPX</a>` : ''}
+      </div>
+      <iframe src="${d.mapEmbed}" style="width:100%;height:260px;border-radius:8px;border:none;" loading="lazy" allowfullscreen></iframe>
     </div>`;
   }
 
+  // Zwiedzanie w tym dniu
+  const daySights = sights.filter(s=>s.day===d.day);
+  if (daySights.length > 0) {
+    body += `<div class="irow" style="border-top:1px solid #21262d;flex-direction:column;align-items:stretch;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div class="ico">🏰</div>
+        <div class="ilbl">Zwiedzanie</div>
+        <div style="flex:1;font-size:12px;color:#8b949e;">${daySights.length} miejsce${daySights.length>1?'':''}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;padding-left:32px;">
+        ${daySights.map(s=>`
+          <div style="display:flex;gap:8px;align-items:flex-start;font-size:13px;">
+            <span style="font-size:15px;">${esc(s.icon||'📍')}</span>
+            <div style="flex:1;">
+              ${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener" style="font-weight:600;">${esc(s.name)}</a>` : `<span style="font-weight:600;">${esc(s.name)}</span>`}
+              <div style="color:#8b949e;font-size:12px;line-height:1.4;">${esc(s.description||'')}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Nocleg
   if (d.acc && d.acc.name) {
     const a = d.acc;
     const cancelCls = a.cancel && a.cancel.includes('⚠️') ? 'br' : 'bg';
+    const accKey = `day.${d.day}.acc.name`;
     body += `<div class="irow">
       <div class="ico">🏠</div>
       <div class="ilbl">Nocleg</div>
       <div style="flex:1;">
-        ${a.url ? `<a href="${a.url}" target="_blank" rel="noopener" style="font-weight:600;">${a.name}</a>` : `<span style="font-weight:600;">${a.name}</span>`}
+        ${a.url ? `<a href="${a.url}" target="_blank" rel="noopener" style="font-weight:600;">${ed(accKey, a.name)}</a>` : `<span style="font-weight:600;">${ed(accKey, a.name)}</span>`}
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;">
-          ${a.pay==='zapłacone' ? '<span class="badge bb">✓ zapłacone</span>' : a.pay ? `<span class="badge bo">${a.pay}</span>` : ''}
-          ${a.cancel ? `<span class="badge ${cancelCls}" style="font-size:10px;">${a.cancel}</span>` : ''}
-          ${a.cost ? `<span class="badge bgy">${a.cost} total</span>` : ''}
+          ${a.pay==='zapłacone' ? '<span class="badge bb">✓ zapłacone</span>' : a.pay ? `<span class="badge bo">${esc(a.pay)}</span>` : ''}
+          ${a.cancel ? `<span class="badge ${cancelCls}" style="font-size:10px;">${esc(a.cancel)}</span>` : ''}
+          ${a.cost ? `<span class="badge bgy">${esc(a.cost)} total</span>` : ''}
         </div>
       </div>
     </div>`;
-    if (a.breakfast) body += `<div class="irow"><div class="ico">🍳</div><div class="ilbl">Śniadanie</div><div>${a.breakfast}</div></div>`;
+    if (a.breakfast) {
+      const bfKey = `day.${d.day}.breakfast`;
+      body += `<div class="irow"><div class="ico">🍳</div><div class="ilbl">Śniadanie</div>
+        <div>${a.breakfastUrl ? `<a href="${a.breakfastUrl}" target="_blank" rel="noopener">${ed(bfKey, a.breakfast)}</a>` : ed(bfKey, a.breakfast)}</div>
+      </div>`;
+    }
   }
-  if (d.rest) body += `<div class="irow"><div class="ico">🍽️</div><div class="ilbl">Restauracja</div><div>${d.rest}</div></div>`;
-  if (d.shop) body += `<div class="irow"><div class="ico">🛒</div><div class="ilbl">Sklep</div><div>${d.shop}</div></div>`;
-  if (d.note) body += `<div class="notebox">${d.note}</div>`;
+
+  // Restauracja
+  if (d.rest) {
+    const rKey = `day.${d.day}.rest`;
+    body += `<div class="irow"><div class="ico">🍽️</div><div class="ilbl">Restauracja</div>
+      <div>${d.restUrl ? `<a href="${d.restUrl}" target="_blank" rel="noopener">${ed(rKey, d.rest)}</a>` : ed(rKey, d.rest)}</div>
+    </div>`;
+  }
+
+  // Sklep
+  if (d.shop) {
+    const sKey = `day.${d.day}.shop`;
+    body += `<div class="irow"><div class="ico">🛒</div><div class="ilbl">Sklep</div><div>${ed(sKey, d.shop)}</div></div>`;
+  }
+
+  // Uwagi
+  const noteKey = `day.${d.day}.notes`;
+  const noteVal = ov(noteKey, d.notes);
+  if (noteVal || editMode) {
+    body += `<div class="irow" style="border-top:1px solid #21262d;">
+      <div class="ico">📝</div>
+      <div class="ilbl">Uwagi</div>
+      <div style="flex:1;color:#ffa657;white-space:pre-wrap;">${ed(noteKey, noteVal || '')}</div>
+    </div>`;
+  }
+
+  const titleKey = `day.${d.day}.title`;
+  const descKey = `day.${d.day}.desc`;
 
   return `<div class="card" style="margin-bottom:12px;">
-    <details ${i===0?'open':''}>
+    <details ${idx===0?'open':''}>
       <summary>
         <div class="day-hdr">
           <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0;">
@@ -482,8 +845,8 @@ function dayCard(d, i) {
               <div style="font-size:10px;color:#6b7280;">${d.dow}</div>
             </div>
             <div style="min-width:0;">
-              <div style="font-weight:700;font-size:15px;line-height:1.3;">${d.title}</div>
-              <div style="font-size:13px;color:#8b949e;margin-top:3px;">${d.desc||''}</div>
+              <div style="font-weight:700;font-size:15px;line-height:1.3;">${ed(titleKey, d.title)}</div>
+              <div style="font-size:13px;color:#8b949e;margin-top:3px;">${ed(descKey, d.desc||'')}</div>
               ${stats}
             </div>
           </div>
@@ -495,42 +858,63 @@ function dayCard(d, i) {
   </div>`;
 }
 
-// ===== SUPABASE CHECKS =====
-async function loadChk() {
+// ===== TASKS (moved to supabase) =====
+async function loadTasks() {
   try {
-    const {data,error}=await db.from('checks').select('*');
+    const {data,error}=await db.from('tasks').select('*').order('order_index').order('created_at');
     if(error) throw error;
-    chk={};
-    (data||[]).forEach(r=>{chk[r.id]=r.checked;});
-  } catch(e){ console.warn('loadChk:',e.message); }
+    tasks=data||[];
+  } catch(e){ console.warn('loadTasks:',e.message); }
 }
-
-async function togChk(id) {
-  const v=!chk[id]; chk[id]=v;
-  renderTasks();
-  try { await db.from('checks').upsert({id,checked:v,updated_at:new Date().toISOString()}); }
-  catch(e){ console.warn('togChk:',e); }
+async function seedTasks() {
+  try {
+    const items=DEFAULT_TASKS.map((t,i)=>({title:t.title,icon:t.icon,order_index:i,dan_checked:false,kuba_checked:false,maciek_checked:false}));
+    await db.from('tasks').insert(items);
+    await loadTasks();
+  } catch(e){ console.warn('seedTasks:',e); }
 }
-
+async function addTask() {
+  const inp=document.getElementById('newtask');
+  const title=inp.value.trim();
+  if(!title) return;
+  inp.value='';
+  try {
+    const {data}=await db.from('tasks').insert({title,icon:'📌',order_index:9999,dan_checked:false,kuba_checked:false,maciek_checked:false}).select();
+    if(data) tasks.push(data[0]);
+    renderTasks();
+  } catch(e){ console.warn('addTask:',e); }
+}
+async function togTask(id) {
+  if(!me){ alert('Wybierz najpierw swoje imię'); return; }
+  const t=tasks.find(x=>x.id===id); if(!t) return;
+  const f=me+'_checked';
+  t[f]=!t[f]; renderTasks();
+  try { await db.from('tasks').update({[f]:t[f]}).eq('id',id); }
+  catch(e){ console.warn('togTask:',e); }
+}
+async function delTask(id) {
+  tasks=tasks.filter(t=>t.id!==id); renderTasks();
+  try { await db.from('tasks').delete().eq('id',id); }
+  catch(e){ console.warn('delTask:',e); }
+}
 function renderTasks() {
-  const c=document.getElementById('tasklist');
-  if(!c) return;
-  c.innerHTML=TASKS.map(t=>{
-    const allDone=PS.every(p=>chk[`t_${t.id}_${p}`]);
+  const c=document.getElementById('tasklist'); if(!c) return;
+  c.innerHTML=tasks.map(t=>{
+    const allDone=PS.every(p=>t[p+'_checked']);
     const avs=PS.map(p=>{
-      const id=`t_${t.id}_${p}`;
-      const on=chk[id];
+      const on=t[p+'_checked'];
       const isMe=p===me;
       return `<div class="av${on?' on':''}${isMe?' me':''}"
         style="${on?`--ac:${PC[p]};--abg:${PBG[p]};`:''}"
         title="${PL[p]}${isMe?' (Ty)':''}"
-        onclick="${isMe?`togChk('${id}')`:''}"
+        onclick="${isMe?`togTask('${t.id}')`:''}"
         >${on?'✓':PL[p][0]}</div>`;
     }).join('');
-    return `<div style="background:#161b22;border:1px solid ${allDone?'#238636':'#30363d'};border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:20px;flex-shrink:0;">${t.icon}</div>
-      <div style="flex:1;font-size:14px;font-weight:500;${allDone?'text-decoration:line-through;color:#8b949e;':''}">${t.label}</div>
+    return `<div style="background:#161b22;border:1px solid ${allDone?'#238636':'#30363d'};border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:20px;flex-shrink:0;">${esc(t.icon||'📌')}</div>
+      <div style="flex:1;font-size:14px;font-weight:500;${allDone?'text-decoration:line-through;color:#8b949e;':''}">${esc(t.title)}</div>
       <div style="display:flex;gap:5px;">${avs}</div>
+      <button onclick="delTask('${t.id}')" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:18px;padding:0 2px;line-height:1;" title="Usuń">×</button>
     </div>`;
   }).join('');
 }
@@ -543,7 +927,6 @@ async function loadPkg() {
     pkgs=data||[];
   } catch(e){ console.warn('loadPkg:',e.message); }
 }
-
 async function seedPkg() {
   try {
     const items=DEFAULT_PKG.map((title,i)=>({title,order_index:i,dan_checked:false,kuba_checked:false,maciek_checked:false}));
@@ -551,11 +934,9 @@ async function seedPkg() {
     await loadPkg();
   } catch(e){ console.warn('seedPkg:',e); }
 }
-
 async function addItem() {
   const inp=document.getElementById('newitem');
-  const title=inp.value.trim();
-  if(!title) return;
+  const title=inp.value.trim(); if(!title) return;
   inp.value='';
   try {
     const {data}=await db.from('packing_items').insert({title,order_index:9999,dan_checked:false,kuba_checked:false,maciek_checked:false}).select();
@@ -563,37 +944,26 @@ async function addItem() {
     renderPack();
   } catch(e){ console.warn('addItem:',e); }
 }
-
 async function togPkg(id) {
   if(!me){alert('Wybierz najpierw swoje imię');return;}
-  const item=pkgs.find(i=>i.id===id);
-  if(!item) return;
+  const item=pkgs.find(i=>i.id===id); if(!item) return;
   const f=me+'_checked';
-  item[f]=!item[f];
-  renderPack();
+  item[f]=!item[f]; renderPack();
   try { await db.from('packing_items').update({[f]:item[f]}).eq('id',id); }
   catch(e){ console.warn('togPkg:',e); }
 }
-
 async function delItem(id) {
-  pkgs=pkgs.filter(i=>i.id!==id);
-  renderPack();
+  pkgs=pkgs.filter(i=>i.id!==id); renderPack();
   try { await db.from('packing_items').delete().eq('id',id); }
   catch(e){ console.warn('delItem:',e); }
 }
-
 function renderPack() {
-  const c=document.getElementById('packlist');
-  if(!c) return;
-  if(pkgs.length===0){
-    c.innerHTML='<div style="text-align:center;color:#8b949e;padding:40px 20px;">Brak przedmiotów. Dodaj pierwszy!</div>';
-    return;
-  }
+  const c=document.getElementById('packlist'); if(!c) return;
+  if(pkgs.length===0){ c.innerHTML='<div style="text-align:center;color:#8b949e;padding:40px 20px;">Brak przedmiotów. Dodaj pierwszy!</div>'; return; }
   c.innerHTML=pkgs.map(item=>{
     const myOn=me&&item[me+'_checked'];
     const avs=PS.map(p=>{
-      const on=item[p+'_checked'];
-      const isMe=p===me;
+      const on=item[p+'_checked']; const isMe=p===me;
       return `<div class="av${on?' on':''}${isMe?' me':''}"
         style="${on?`--ac:${PC[p]};--abg:${PBG[p]};`:''}"
         title="${PL[p]}"
@@ -601,11 +971,81 @@ function renderPack() {
         >${on?'✓':PL[p][0]}</div>`;
     }).join('');
     return `<div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
-      <div style="flex:1;font-size:14px;${myOn?'text-decoration:line-through;color:#8b949e;':''}">${item.title}</div>
+      <div style="flex:1;font-size:14px;${myOn?'text-decoration:line-through;color:#8b949e;':''}">${esc(item.title)}</div>
       <div style="display:flex;gap:5px;">${avs}</div>
       <button onclick="delItem('${item.id}')" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:18px;padding:0 2px;line-height:1;" title="Usuń">×</button>
     </div>`;
   }).join('');
+}
+
+// ===== SIGHTS =====
+async function loadSights() {
+  try {
+    const {data,error}=await db.from('sights').select('*').order('day').order('order_index').order('created_at');
+    if(error) throw error;
+    sights=data||[];
+  } catch(e){ console.warn('loadSights:',e.message); }
+}
+async function seedSights() {
+  try {
+    const items=DEFAULT_SIGHTS.map((s,i)=>({day:s.day,name:s.name,icon:s.icon,description:s.desc,url:s.url,order_index:i}));
+    await db.from('sights').insert(items);
+    await loadSights();
+  } catch(e){ console.warn('seedSights:',e); }
+}
+function openSightModal() { document.getElementById('sightModal').style.display='flex'; }
+function closeSightModal() {
+  document.getElementById('sightModal').style.display='none';
+  ['smName','smIcon','smDesc','smUrl','smImg'].forEach(id=>document.getElementById(id).value='');
+}
+async function saveSight() {
+  const day=parseInt(document.getElementById('smDay').value);
+  const name=document.getElementById('smName').value.trim();
+  const icon=document.getElementById('smIcon').value.trim()||'📍';
+  const description=document.getElementById('smDesc').value.trim();
+  const url=document.getElementById('smUrl').value.trim();
+  const image_url=document.getElementById('smImg').value.trim();
+  if(!name) { alert('Podaj nazwę'); return; }
+  try {
+    const {data}=await db.from('sights').insert({day,name,icon,description,url,image_url,order_index:9999}).select();
+    if(data) sights.push(data[0]);
+    closeSightModal(); renderSights(); renderPlan();
+  } catch(e){ console.warn('saveSight:',e); alert('Błąd zapisu'); }
+}
+async function delSight(id) {
+  if(!confirm('Usunąć to miejsce?')) return;
+  sights=sights.filter(s=>s.id!==id);
+  renderSights(); renderPlan();
+  try { await db.from('sights').delete().eq('id',id); }
+  catch(e){ console.warn('delSight:',e); }
+}
+function renderSights() {
+  const c=document.getElementById('sightsList'); if(!c) return;
+  const filter=document.getElementById('sightDayFilter').value;
+  const list = filter==='all' ? sights : sights.filter(s=>s.day===parseInt(filter));
+  if(list.length===0){ c.innerHTML='<div style="text-align:center;color:#8b949e;padding:40px 20px;">Brak miejsc. Dodaj pierwsze!</div>'; return; }
+  const byDay={};
+  list.forEach(s=>{ if(!byDay[s.day]) byDay[s.day]=[]; byDay[s.day].push(s); });
+  const dayLabels={1:'Dzień 1 · 5.08 Edynburg',2:'Dzień 2 · 6.08 Fort Augustus',3:'Dzień 3 · 7.08 Ratagan',4:'Dzień 4 · 8.08 Achnasheen',5:'Dzień 5 · 9.08 Dundonnell',6:'Dzień 6 · 10.08 Bonar Bridge',7:'Dzień 7 · 11.08 Inverness',8:'Dzień 8 · 12.08 Edynburg'};
+  c.innerHTML=Object.keys(byDay).sort((a,b)=>parseInt(a)-parseInt(b)).map(day=>`
+    <div style="margin-bottom:8px;">
+      <div style="font-size:12px;color:#8b949e;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;padding:6px 0;">${dayLabels[day]||'Dzień '+day}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${byDay[day].map(s=>`
+          <div class="sight-card">
+            <div class="sight-thumb">${s.image_url ? `<img src="${esc(s.image_url)}" alt="">` : esc(s.icon||'📍')}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:700;font-size:14px;">
+                ${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)} ↗</a>` : esc(s.name)}
+              </div>
+              <div style="font-size:13px;color:#8b949e;line-height:1.4;margin-top:2px;">${esc(s.description||'')}</div>
+            </div>
+            <button onclick="delSight('${s.id}')" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:18px;padding:0 4px;line-height:1;flex-shrink:0;" title="Usuń">×</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
 }
 
 init();
