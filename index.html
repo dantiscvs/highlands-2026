@@ -82,6 +82,9 @@ tr:last-child td { border-bottom: none; }
 .pbar { height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; margin-top: 8px; }
 .pbar > div { height: 100%; background: linear-gradient(to right,#238636,#56d364); border-radius: 4px; transition: width .3s; }
 .next-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+.mini-stat { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 8px 6px; text-align: center; }
+.mv { font-size: 15px; font-weight: 800; line-height: 1.1; }
+.ml { font-size: 10px; color: #8b949e; margin-top: 3px; }
 @media(max-width:500px){.tt{font-size:22px;}.stat-box{padding:8px;}.sv{font-size:17px;}.tab{padding:10px 12px;font-size:12px;}.cd-v{font-size:20px;}}
 </style>
 </head>
@@ -618,7 +621,7 @@ const DAYS = [
          url:'https://www.booking.com/hotel/gb/morag-s-lodge.en-gb.html',
          cost:'606 zł',pay:'Pay nothing until 2 August 2026',
          cancel:'Free cancellation before 4 August 2026',
-         breakfast:'32 zł / osoba'},
+         breakfast:null},
     rest:'Highland Hideout (8pm) · Beaufort House PIZZA (8:30pm)',
     restUrl:'https://maps.app.goo.gl/ZhBdxHWQx87woLRL7',
     shop:null,
@@ -652,8 +655,7 @@ const DAYS = [
          url:'https://www.booking.com/hotel/gb/ledgowan-bunkhouse.en-gb.html',
          cost:'684 zł',pay:'zapłacone',
          cancel:'⚠️ BRAK możliwości odwołania',
-         breakfast:'The Midge Bite Cafe Achnasheen',
-         breakfastUrl:'https://maps.app.goo.gl/F22VUNe5EE8Rg2ba7'},
+         breakfast:'32 zł / osoba'},
     rest:'Kinlochewe Hotel — The Stag Highland Restaurant',
     restUrl:'https://maps.app.goo.gl/chc1V8kXPWVFsGRz6',
     shop:'Eilean Donan Visitor\'s Centre w Dornie (po drodze)',
@@ -670,7 +672,8 @@ const DAYS = [
          url:'https://www.booking.com/hotel/gb/the-dundonnell.en-gb.html',
          cost:'1 044 zł',pay:'zapłacone',
          cancel:'Free cancellation before 7 August 2026',
-         breakfast:'w cenie'},
+         breakfast:'The Midge Bite Cafe Achnasheen',
+         breakfastUrl:'https://maps.app.goo.gl/F22VUNe5EE8Rg2ba7'},
     rest:'Kolacja w hotelu (18:00–20:00)',
     restUrl:null,
     shop:'Poolewe — Mace (po drodze)',
@@ -700,7 +703,7 @@ const DAYS = [
     km:102.5,el:680,
     mapEmbed:'https://mapy.com/s/letosucefu',mapFull:'https://mapy.com/s/moduhonuto',
     gpx:'gpx/day6-bonar-bridge-inverness.gpx',
-    acc:{name:'Nocleg u dziewczyn w Musselburgh',url:null,cost:null,pay:null,cancel:null,breakfast:null},
+    acc:{name:'Nocleg u dziewczyn w Musselburgh',url:null,cost:null,pay:null,cancel:null,breakfast:'w cenie'},
     rest:'Coś w Inverness przed pociągiem',
     restUrl:null,
     shop:'Spar — centrum Bonar Bridge (przed wyjazdem rano)',
@@ -715,6 +718,49 @@ const DAYS = [
     notes:'✈️ Wylot: 21:20 z Edynburga.',
   },
 ];
+
+// ===== SHARED STATS HELPERS =====
+function effortScore(km, el) {
+  const eff = km + el/100;
+  if (eff < 40)      return { eff, score: 1, label: 'Bardzo łatwy', color: '#56d364' };
+  if (eff < 70)      return { eff, score: 2, label: 'Łatwy', color: '#79c0ff' };
+  if (eff < 95)      return { eff, score: 3, label: 'Umiarkowany', color: '#ffa657' };
+  if (eff < 115)     return { eff, score: 4, label: 'Trudny', color: '#ff7b72' };
+  return               { eff, score: 5, label: 'Bardzo trudny', color: '#f85149' };
+}
+function cyclingIndex(d) { return DAYS.filter(x => x.km).findIndex(x => x.day === d.day); }
+function computeDayStats(d) {
+  if (!d.km) return null;
+  const cIdx = cyclingIndex(d);
+  const last = DAYS.filter(x => x.km).length - 1;
+  let movingH, totalWindow, startTime, endTime, constraint;
+  if (cIdx === 0) {
+    startTime = '14:45'; endTime = '19:00';
+    movingH = 3.75; totalWindow = 4.25;
+    constraint = 'Start po pociągu (14:16). Fort Augustus max 19:00 — restauracja się zamyka.';
+  } else if (cIdx === last) {
+    startTime = '7:00'; endTime = '17:00';
+    movingH = 8; totalWindow = 10;
+    constraint = 'Pociąg 18:52 z Inverness → arrival max 17:00 (spakowanie rowerów, dojazd na stację).';
+  } else {
+    startTime = '7:30'; endTime = '17:30';
+    movingH = 8; totalWindow = 10;
+    constraint = 'Standard: 8h pedałowania + 2h przerw = 10h dziennie.';
+  }
+  const speed = d.km / movingH;
+  const score = effortScore(d.km, d.el);
+  let spdLbl, spdCol;
+  if (speed < 12)      { spdLbl = 'Spokojne tempo';       spdCol = '#56d364'; }
+  else if (speed < 14) { spdLbl = 'Solidne tempo';        spdCol = '#79c0ff'; }
+  else if (speed < 16) { spdLbl = 'Wysokie tempo';        spdCol = '#ffa657'; }
+  else                 { spdLbl = 'Trzeba się cisnąć';    spdCol = '#ff7b72'; }
+  return { cyclingIdx: cIdx, movingH, totalWindow, startTime, endTime, constraint, speed, score, spdLbl, spdCol };
+}
+function stars(n, color) {
+  let s = '';
+  for (let i = 1; i <= 5; i++) s += i <= n ? '★' : '<span style="color:#30363d;">★</span>';
+  return `<span style="color:${color};letter-spacing:1px;">${s}</span>`;
+}
 
 // ===== INIT =====
 let snap = { content:'', tasks:'', pkgs:'', sights:'' };
@@ -911,60 +957,20 @@ function renderStart() {
 
 // ===== STATS =====
 function renderStats() {
-  const cycling = DAYS.filter(d => d.km).map((d, i) => {
-    const eff = d.km + d.el/100;
-    let movingH, totalWindow, startTime, endTime, constraint;
-    if (i === 0) {
-      // Day 1 cycling (6.08): 14:16 arrival, ready ~14:45, must reach Fort Augustus by 19:00
-      startTime = '14:45'; endTime = '19:00';
-      const totalMin = 4*60 + 15;
-      const breakMin = 30;
-      movingH = (totalMin - breakMin) / 60;
-      totalWindow = totalMin/60;
-      constraint = 'Start po pociągu (14:16). Fort Augustus max 19:00 — restauracja się zamyka.';
-    } else if (i === 5) {
-      // Last cycling (11.08): 18:52 train, arrive Inverness by 17:00
-      startTime = '7:00'; endTime = '17:00';
-      const totalMin = 10*60;
-      const breakMin = 2*60;
-      movingH = (totalMin - breakMin) / 60;
-      totalWindow = totalMin/60;
-      constraint = 'Pociąg 18:52 z Inverness → arrival max 17:00 (spakowanie rowerów, dojazd na stację).';
-    } else {
-      startTime = '7:30'; endTime = '17:30';
-      movingH = 8;
-      totalWindow = 10;
-      constraint = 'Standard: 8h pedałowania + 2h przerw = 10h dziennie.';
-    }
-    const speed = d.km / movingH;
-    // Difficulty by effort km (combining distance + elevation)
-    let diffLevel, diffLbl, diffCol;
-    if (eff < 70)      { diffLevel = 1; diffLbl = 'Łatwy'; diffCol = '#56d364'; }
-    else if (eff < 100){ diffLevel = 2; diffLbl = 'Umiarkowany'; diffCol = '#79c0ff'; }
-    else if (eff < 110){ diffLevel = 3; diffLbl = 'Trudny'; diffCol = '#ffa657'; }
-    else               { diffLevel = 4; diffLbl = 'Bardzo trudny'; diffCol = '#ff7b72'; }
-    // Speed pressure — separate from physical difficulty
-    let spdLbl, spdCol;
-    if (speed < 12)      { spdLbl = 'Spokojne tempo'; spdCol = '#56d364'; }
-    else if (speed < 14) { spdLbl = 'Solidne tempo'; spdCol = '#79c0ff'; }
-    else if (speed < 16) { spdLbl = 'Wysokie tempo'; spdCol = '#ffa657'; }
-    else                 { spdLbl = 'Trzeba się cisnąć'; spdCol = '#ff7b72'; }
-    return { d, cycleNum: i+1, eff, movingH, totalWindow, startTime, endTime, constraint, speed, diffLevel, diffLbl, diffCol, spdLbl, spdCol };
-  });
+  const cycling = DAYS.filter(d => d.km).map((d, i) => ({ d, cycleNum: i+1, s: computeDayStats(d) }));
 
-  const totalKm  = cycling.reduce((s,c) => s + c.d.km, 0);
-  const totalEl  = cycling.reduce((s,c) => s + c.d.el, 0);
-  const totalEff = cycling.reduce((s,c) => s + c.eff, 0);
-  const avgSpeed = cycling.reduce((s,c) => s + c.speed, 0) / cycling.length;
+  const totalKm  = cycling.reduce((sum,c) => sum + c.d.km, 0);
+  const totalEl  = cycling.reduce((sum,c) => sum + c.d.el, 0);
+  const avgScore = cycling.reduce((sum,c) => sum + c.s.score.score, 0) / cycling.length;
+  const avgSpeed = cycling.reduce((sum,c) => sum + c.s.speed, 0) / cycling.length;
   const maxKm    = Math.max(...cycling.map(c => c.d.km));
   const maxEl    = Math.max(...cycling.map(c => c.d.el));
-  const maxEff   = Math.max(...cycling.map(c => c.eff));
 
   function barChart(vals, max, unit, colorFn) {
     return `<div style="display:flex;gap:6px;align-items:flex-end;height:150px;padding:0 4px;">
       ${vals.map(v => {
         const h = Math.round((v.value / max) * 100);
-        const col = colorFn ? colorFn(v.value) : '#56d364';
+        const col = v.color || (colorFn ? colorFn(v.value) : '#56d364');
         return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;">
           <div style="font-size:11px;font-weight:700;color:${col};margin-bottom:4px;white-space:nowrap;">${v.label}${unit?' '+unit:''}</div>
           <div style="width:100%;background:${col};height:${h}%;border-radius:4px 4px 0 0;min-height:2px;transition:height .3s;"></div>
@@ -976,15 +982,13 @@ function renderStats() {
     </div>`;
   }
 
-  const kmBars = cycling.map(c => ({ day: c.d.date, label: c.d.km, value: c.d.km }));
-  const elBars = cycling.map(c => ({ day: c.d.date, label: c.d.el, value: c.d.el }));
-  const effBars = cycling.map(c => ({ day: c.d.date, label: Math.round(c.eff), value: c.eff }));
-  const spdBars = cycling.map(c => ({ day: c.d.date, label: c.speed.toFixed(1), value: c.speed }));
+  const kmBars  = cycling.map(c => ({ day: c.d.date, label: c.d.km,                  value: c.d.km }));
+  const elBars  = cycling.map(c => ({ day: c.d.date, label: c.d.el,                  value: c.d.el }));
+  const effBars = cycling.map(c => ({ day: c.d.date, label: c.s.score.score + '/5',   value: c.s.score.score, color: c.s.score.color }));
+  const spdBars = cycling.map(c => ({ day: c.d.date, label: c.s.speed.toFixed(1),     value: c.s.speed,       color: c.s.spdCol }));
 
   const kmColor = v => v < 70 ? '#56d364' : v < 95 ? '#79c0ff' : v < 105 ? '#ffa657' : '#ff7b72';
   const elColor = v => v < 700 ? '#56d364' : v < 1000 ? '#79c0ff' : v < 1150 ? '#ffa657' : '#ff7b72';
-  const effColor = v => v < 70 ? '#56d364' : v < 100 ? '#79c0ff' : v < 110 ? '#ffa657' : '#ff7b72';
-  const spdColor = v => v < 12 ? '#56d364' : v < 14 ? '#79c0ff' : v < 16 ? '#ffa657' : '#ff7b72';
 
   document.getElementById('tstat').innerHTML = `
     <div class="sh">📊 Statystyki i wysiłek dzienny</div>
@@ -994,13 +998,13 @@ function renderStats() {
       <strong style="color:#ffa657;">Dzień 1</strong> ograniczony (start ~14:45 po pociągu, Fort Augustus max 19:00 przez godzinę zamknięcia restauracji).
       <strong style="color:#ffa657;">Dzień 6</strong> ograniczony (Inverness max 17:00 — pakowanie rowerów + pociąg 18:52).
       <br>
-      <strong style="color:#e6edf3;">"Effort km"</strong> to metryka łącząca dystans i przewyższenia: <code>km + m/100</code>.
+      <strong style="color:#e6edf3;">Effort 0–5</strong> to ocena trudności etapu łącząca dystans i przewyższenia — obliczana z <code>km + m/100</code>.
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px;">
       <div class="stat-box"><div class="sv">${totalKm.toFixed(1)}</div><div class="sl">km łącznie</div></div>
       <div class="stat-box"><div class="sv">${totalEl}</div><div class="sl">m przewyższenia</div></div>
-      <div class="stat-box"><div class="sv">${Math.round(totalEff)}</div><div class="sl">effort km</div></div>
+      <div class="stat-box"><div class="sv">${avgScore.toFixed(1)}<span style="font-size:14px;color:#8b949e;">/5</span></div><div class="sl">avg effort</div></div>
       <div class="stat-box"><div class="sv">${avgSpeed.toFixed(1)}</div><div class="sl">km/h średnio</div></div>
     </div>
 
@@ -1015,13 +1019,16 @@ function renderStats() {
     </div>
 
     <div class="card" style="padding:16px;margin-bottom:16px;">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">💪 Effort km (dystans + przewyższenia/100)</div>
-      ${barChart(effBars, maxEff * 1.05, '', effColor)}
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">💪 Trudność etapu (0–5)</div>
+      ${barChart(effBars, 5.5, '', null)}
+      <div style="font-size:11px;color:#8b949e;margin-top:10px;line-height:1.5;padding-top:10px;border-top:1px solid #21262d;">
+        1 🟢 bardzo łatwy · 2 🔵 łatwy · 3 🟠 umiarkowany · 4 🔴 trudny · 5 🔥 bardzo trudny
+      </div>
     </div>
 
     <div class="card" style="padding:16px;margin-bottom:24px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:12px;">⚡ Wymagane tempo (km/h w ruchu)</div>
-      ${barChart(spdBars, Math.max(...cycling.map(c=>c.speed))*1.1, '', spdColor)}
+      ${barChart(spdBars, Math.max(...cycling.map(c=>c.s.speed))*1.1, '', null)}
       <div style="font-size:11px;color:#8b949e;margin-top:10px;line-height:1.5;padding-top:10px;border-top:1px solid #21262d;">
         🟢 &lt;12 km/h spokojne · 🔵 12–14 solidne · 🟠 14–16 wysokie · 🔴 16+ trzeba się cisnąć
       </div>
@@ -1030,14 +1037,15 @@ function renderStats() {
     <div class="sh" style="margin-top:8px;">Rozpiska dzienna</div>
     <div style="display:flex;flex-direction:column;gap:12px;">
       ${cycling.map(c => `
-        <div class="card" style="padding:16px;border-left:4px solid ${c.diffCol};">
+        <div class="card" style="padding:16px;border-left:4px solid ${c.s.score.color};">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
             <div>
               <div style="font-weight:800;font-size:16px;">${c.d.ico} Etap ${c.cycleNum} · ${esc(c.d.title)}</div>
               <div style="font-size:12px;color:#8b949e;margin-top:2px;">${c.d.date} · ${c.d.dow}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
-              <div class="badge" style="background:${c.diffCol}22;color:${c.diffCol};border:1px solid ${c.diffCol};">${c.diffLbl}</div>
+              <div style="font-size:15px;">${stars(c.s.score.score, c.s.score.color)}</div>
+              <div style="font-size:11px;color:${c.s.score.color};font-weight:700;margin-top:2px;">${c.s.score.label}</div>
             </div>
           </div>
 
@@ -1051,24 +1059,24 @@ function renderStats() {
               <div style="font-size:10px;color:#8b949e;">m ⛰️</div>
             </div>
             <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
-              <div style="font-size:16px;font-weight:800;">${Math.round(c.eff)}</div>
+              <div style="font-size:16px;font-weight:800;color:${c.s.score.color};">${c.s.score.score}/5</div>
               <div style="font-size:10px;color:#8b949e;">effort</div>
             </div>
             <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
-              <div style="font-size:16px;font-weight:800;color:${c.spdCol};">${c.speed.toFixed(1)}</div>
+              <div style="font-size:16px;font-weight:800;color:${c.s.spdCol};">${c.s.speed.toFixed(1)}</div>
               <div style="font-size:10px;color:#8b949e;">km/h</div>
             </div>
           </div>
 
           <div style="background:#0d1117;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-              <div><span style="color:#8b949e;">Start:</span> <strong>${c.startTime}</strong> &nbsp;→&nbsp; <span style="color:#8b949e;">Meta:</span> <strong>${c.endTime}</strong></div>
-              <div style="color:#8b949e;font-size:12px;">okno ${c.totalWindow}h · w ruchu ${c.movingH}h</div>
+              <div><span style="color:#8b949e;">Start:</span> <strong>${c.s.startTime}</strong> &nbsp;→&nbsp; <span style="color:#8b949e;">Meta:</span> <strong>${c.s.endTime}</strong></div>
+              <div style="color:#8b949e;font-size:12px;">okno ${c.s.totalWindow}h · w ruchu ${c.s.movingH}h</div>
             </div>
           </div>
 
-          <div style="font-size:12px;color:${c.spdCol};font-weight:600;margin-bottom:4px;">⚡ ${c.spdLbl}</div>
-          <div style="font-size:12px;color:#8b949e;line-height:1.5;">${esc(c.constraint)}</div>
+          <div style="font-size:12px;color:${c.s.spdCol};font-weight:600;margin-bottom:4px;">⚡ ${c.s.spdLbl}</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.5;">${esc(c.s.constraint)}</div>
         </div>
       `).join('')}
     </div>
@@ -1150,6 +1158,17 @@ function dayCard(d, idx, isOpen) {
     </div>` : '';
 
   let body = '';
+
+  // Mini statystyki dnia
+  const s = computeDayStats(d);
+  if (s) {
+    body += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+      <div class="mini-stat"><div class="mv">${d.km}</div><div class="ml">km</div></div>
+      <div class="mini-stat"><div class="mv">${d.el}</div><div class="ml">m ⛰️</div></div>
+      <div class="mini-stat"><div class="mv" style="color:${s.score.color};">${s.score.score}/5</div><div class="ml">effort</div></div>
+      <div class="mini-stat"><div class="mv" style="color:${s.spdCol};">${s.speed.toFixed(1)}</div><div class="ml">km/h ⚡</div></div>
+    </div>`;
+  }
 
   // Mapa + buttony
   if (d.mapEmbed) {
