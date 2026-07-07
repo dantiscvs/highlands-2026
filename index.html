@@ -940,14 +940,22 @@ function toggleEdit() {
 
 // ===== PLAN =====
 function renderPlan() {
-  document.getElementById('tp').innerHTML = DAYS.map((d,i)=>dayCard(d,i)).join('');
+  const container = document.getElementById('tp');
+  const existing = container.querySelectorAll('details');
+  const openDays = new Set();
+  if (existing.length === 0) {
+    openDays.add(0);
+  } else {
+    existing.forEach((el, i) => { if (el.open) openDays.add(i); });
+  }
+  container.innerHTML = DAYS.map((d,i)=>dayCard(d,i,openDays.has(i))).join('');
   applyContent();
 }
 
 function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function ed(key, text){ return `<span data-edit="${key}">${esc(text||'')}</span>`; }
 
-function dayCard(d, idx) {
+function dayCard(d, idx, isOpen) {
   const stats = d.km ? `
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
       <span class="badge bg">🚴 ${d.km} km</span>
@@ -1043,7 +1051,7 @@ function dayCard(d, idx) {
   const descKey = `day.${d.day}.desc`;
 
   return `<div class="card" style="margin-bottom:12px;">
-    <details ${idx===0?'open':''}>
+    <details ${isOpen?'open':''}>
       <summary>
         <div class="day-hdr">
           <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0;">
