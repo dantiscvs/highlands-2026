@@ -738,17 +738,18 @@ function computeDayStats(d) {
   if (!d.km) return null;
   const cIdx = cyclingIndex(d);
   const last = DAYS.filter(x => x.km).length - 1;
-  let movingH, totalWindow, startTime, endTime, constraint;
+  let movingH, totalWindow, startTime, endTime, constraint, movingNote;
   if (cIdx === 0) {
-    startTime = '14:45'; endTime = '19:00';
-    movingH = 3.75; totalWindow = 4.25;
-    constraint = 'Start po pociągu (14:16). Fort Augustus max 19:00 — restauracja się zamyka.';
+    startTime = '9:00'; endTime = '19:00';
+    movingH = 3.75; totalWindow = 10;
+    movingNote = 'na rowerze 14:45–19:00';
+    constraint = 'Wyjazd z Musselburgh 9:00. Pociąg 10:33–14:16 → start rowerowy z Inverness ~14:45. Fort Augustus max 19:00 (zamknięcie restauracji). Efektywne okno cyclingowe 4h 15m.';
   } else if (cIdx === last) {
-    startTime = '7:00'; endTime = '17:00';
-    movingH = 8; totalWindow = 10;
-    constraint = 'Pociąg 18:52 z Inverness → arrival max 17:00 (spakowanie rowerów, dojazd na stację).';
+    startTime = '8:00'; endTime = '17:00';
+    movingH = 7; totalWindow = 9;
+    constraint = 'Pociąg 18:52 z Inverness → arrival Inverness max 17:00 (spakowanie rowerów, dojazd na stację). Krótsze okno przez późniejszy start.';
   } else {
-    startTime = '7:30'; endTime = '17:30';
+    startTime = '8:00'; endTime = '18:00';
     movingH = 8; totalWindow = 10;
     constraint = 'Standard: 8h pedałowania + 2h przerw = 10h dziennie.';
   }
@@ -759,7 +760,7 @@ function computeDayStats(d) {
   else if (speed < 14) { spdLbl = 'Solidne tempo';        spdCol = '#79c0ff'; }
   else if (speed < 16) { spdLbl = 'Wysokie tempo';        spdCol = '#ffa657'; }
   else                 { spdLbl = 'Trzeba się cisnąć';    spdCol = '#ff7b72'; }
-  return { cyclingIdx: cIdx, movingH, totalWindow, startTime, endTime, constraint, speed, score, spdLbl, spdCol };
+  return { cyclingIdx: cIdx, movingH, totalWindow, startTime, endTime, constraint, movingNote, speed, score, spdLbl, spdCol };
 }
 function scoreBar(n, color, width = 90) {
   const pct = Math.max(0, Math.min(100, n * 10));
@@ -1078,7 +1079,7 @@ function renderStats() {
           <div style="background:#0d1117;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
               <div><span style="color:#8b949e;">Start:</span> <strong>${c.s.startTime}</strong> &nbsp;→&nbsp; <span style="color:#8b949e;">Meta:</span> <strong>${c.s.endTime}</strong></div>
-              <div style="color:#8b949e;font-size:12px;">okno ${c.s.totalWindow}h · w ruchu ${c.s.movingH}h</div>
+              <div style="color:#8b949e;font-size:12px;">okno ${c.s.totalWindow}h · w ruchu ${c.s.movingH}h${c.s.movingNote ? ` (${c.s.movingNote})` : ''}</div>
             </div>
           </div>
 
