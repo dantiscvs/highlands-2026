@@ -119,14 +119,15 @@ tr:last-child td { border-bottom: none; }
 
 <nav style="position:sticky;top:63px;z-index:98;">
   <div style="max-width:940px;margin:0 auto;display:flex;">
-    <button class="tab on" onclick="goTab('start',this)">🏠 Start</button>
-    <button class="tab" onclick="goTab('plan',this)">📅 Plan</button>
-    <button class="tab" onclick="goTab('sights',this)">🏰 Zwiedzanie</button>
-    <button class="tab" onclick="goTab('flights',this)">✈️ Loty</button>
-    <button class="tab" onclick="goTab('train',this)">🚂 Pociągi</button>
-    <button class="tab" onclick="goTab('budget',this)">💰 Koszty</button>
-    <button class="tab" onclick="goTab('tasks',this)">✅ Zadania</button>
-    <button class="tab" onclick="goTab('packing',this)">🎒 Pakowanie</button>
+    <button class="tab on" data-tab="start" onclick="goTab('start')">🏠 Start</button>
+    <button class="tab" data-tab="plan" onclick="goTab('plan')">📅 Plan</button>
+    <button class="tab" data-tab="stats" onclick="goTab('stats')">📊 Statystyki</button>
+    <button class="tab" data-tab="sights" onclick="goTab('sights')">🏰 Zwiedzanie</button>
+    <button class="tab" data-tab="flights" onclick="goTab('flights')">✈️ Loty</button>
+    <button class="tab" data-tab="train" onclick="goTab('train')">🚂 Pociągi</button>
+    <button class="tab" data-tab="budget" onclick="goTab('budget')">💰 Koszty</button>
+    <button class="tab" data-tab="tasks" onclick="goTab('tasks')">✅ Zadania</button>
+    <button class="tab" data-tab="packing" onclick="goTab('packing')">🎒 Pakowanie</button>
   </div>
 </nav>
 
@@ -137,6 +138,8 @@ tr:last-child td { border-bottom: none; }
 <div id="tst"></div>
 
 <div id="tp" style="display:none;"></div>
+
+<div id="tstat" style="display:none;"></div>
 
 <div id="ts" style="display:none;">
   <div class="sh">🏰 Zwiedzanie na trasie</div>
@@ -772,13 +775,15 @@ function updBadge() {
 }
 
 // ===== TABS =====
-function goTab(name, btn) {
-  const map={start:'tst',plan:'tp',sights:'ts',flights:'tf',train:'tt',budget:'tb',tasks:'tts',packing:'tpk'};
+function goTab(name) {
+  const map={start:'tst',plan:'tp',stats:'tstat',sights:'ts',flights:'tf',train:'tt',budget:'tb',tasks:'tts',packing:'tpk'};
   Object.values(map).forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById(map[name]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  const btn = document.querySelector(`.tab[data-tab="${name}"]`);
   if(btn) btn.classList.add('on');
   if(name==='start') renderStart();
+  if(name==='stats') renderStats();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -847,9 +852,9 @@ function renderStart() {
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
-      <div class="stat-box"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
-      <div class="stat-box"><div class="sv">5 523</div><div class="sl">m przewyższenia</div></div>
-      <div class="stat-box"><div class="sv">5 123</div><div class="sl">PLN / osoba</div></div>
+      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
+      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">5 723</div><div class="sl">m przewyższenia</div></div>
+      <div class="stat-box" style="cursor:pointer;" onclick="goTab('budget')" title="Zobacz koszty"><div class="sv">5 123</div><div class="sl">PLN / osoba</div></div>
     </div>
 
     ${nextDay ? `
@@ -861,7 +866,7 @@ function renderStart() {
           <div style="font-weight:700;font-size:15px;">${esc(nextDay.title)}</div>
           <div style="font-size:12px;color:#8b949e;">${nextDay.date} · ${nextDay.dow}</div>
         </div>
-        <button class="btn btn-sm" onclick="goTab('plan',document.querySelector('.tab:nth-child(2)'))">Zobacz →</button>
+        <button class="btn btn-sm" onclick="goTab('plan')">Zobacz →</button>
       </div>
     </div>` : ''}
 
@@ -892,12 +897,180 @@ function renderStart() {
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
-      <button class="btn" onclick="goTab('plan',document.querySelector('.tab:nth-child(2)'))" style="justify-content:center;padding:14px;">📅 Plan</button>
-      <button class="btn" onclick="goTab('sights',document.querySelector('.tab:nth-child(3)'))" style="justify-content:center;padding:14px;">🏰 Zwiedzanie</button>
-      <button class="btn" onclick="goTab('flights',document.querySelector('.tab:nth-child(4)'))" style="justify-content:center;padding:14px;">✈️ Loty</button>
-      <button class="btn" onclick="goTab('train',document.querySelector('.tab:nth-child(5)'))" style="justify-content:center;padding:14px;">🚂 Pociągi</button>
-      <button class="btn" onclick="goTab('budget',document.querySelector('.tab:nth-child(6)'))" style="justify-content:center;padding:14px;">💰 Koszty</button>
-      <button class="btn" onclick="goTab('tasks',document.querySelector('.tab:nth-child(7)'))" style="justify-content:center;padding:14px;">✅ Zadania</button>
+      <button class="btn" onclick="goTab('plan')" style="justify-content:center;padding:14px;">📅 Plan</button>
+      <button class="btn" onclick="goTab('stats')" style="justify-content:center;padding:14px;">📊 Statystyki</button>
+      <button class="btn" onclick="goTab('sights')" style="justify-content:center;padding:14px;">🏰 Zwiedzanie</button>
+      <button class="btn" onclick="goTab('flights')" style="justify-content:center;padding:14px;">✈️ Loty</button>
+      <button class="btn" onclick="goTab('train')" style="justify-content:center;padding:14px;">🚂 Pociągi</button>
+      <button class="btn" onclick="goTab('budget')" style="justify-content:center;padding:14px;">💰 Koszty</button>
+      <button class="btn" onclick="goTab('tasks')" style="justify-content:center;padding:14px;">✅ Zadania</button>
+      <button class="btn" onclick="goTab('packing')" style="justify-content:center;padding:14px;">🎒 Pakowanie</button>
+    </div>
+  `;
+}
+
+// ===== STATS =====
+function renderStats() {
+  const cycling = DAYS.filter(d => d.km).map((d, i) => {
+    const eff = d.km + d.el/100;
+    let movingH, totalWindow, startTime, endTime, constraint;
+    if (i === 0) {
+      // Day 1 cycling (6.08): 14:16 arrival, ready ~14:45, must reach Fort Augustus by 19:00
+      startTime = '14:45'; endTime = '19:00';
+      const totalMin = 4*60 + 15;
+      const breakMin = 30;
+      movingH = (totalMin - breakMin) / 60;
+      totalWindow = totalMin/60;
+      constraint = 'Start po pociągu (14:16). Fort Augustus max 19:00 — restauracja się zamyka.';
+    } else if (i === 5) {
+      // Last cycling (11.08): 18:52 train, arrive Inverness by 17:00
+      startTime = '7:00'; endTime = '17:00';
+      const totalMin = 10*60;
+      const breakMin = 2*60;
+      movingH = (totalMin - breakMin) / 60;
+      totalWindow = totalMin/60;
+      constraint = 'Pociąg 18:52 z Inverness → arrival max 17:00 (spakowanie rowerów, dojazd na stację).';
+    } else {
+      startTime = '7:30'; endTime = '17:30';
+      movingH = 8;
+      totalWindow = 10;
+      constraint = 'Standard: 8h pedałowania + 2h przerw = 10h dziennie.';
+    }
+    const speed = d.km / movingH;
+    // Difficulty by effort km (combining distance + elevation)
+    let diffLevel, diffLbl, diffCol;
+    if (eff < 70)      { diffLevel = 1; diffLbl = 'Łatwy'; diffCol = '#56d364'; }
+    else if (eff < 100){ diffLevel = 2; diffLbl = 'Umiarkowany'; diffCol = '#79c0ff'; }
+    else if (eff < 110){ diffLevel = 3; diffLbl = 'Trudny'; diffCol = '#ffa657'; }
+    else               { diffLevel = 4; diffLbl = 'Bardzo trudny'; diffCol = '#ff7b72'; }
+    // Speed pressure — separate from physical difficulty
+    let spdLbl, spdCol;
+    if (speed < 12)      { spdLbl = 'Spokojne tempo'; spdCol = '#56d364'; }
+    else if (speed < 14) { spdLbl = 'Solidne tempo'; spdCol = '#79c0ff'; }
+    else if (speed < 16) { spdLbl = 'Wysokie tempo'; spdCol = '#ffa657'; }
+    else                 { spdLbl = 'Trzeba się cisnąć'; spdCol = '#ff7b72'; }
+    return { d, cycleNum: i+1, eff, movingH, totalWindow, startTime, endTime, constraint, speed, diffLevel, diffLbl, diffCol, spdLbl, spdCol };
+  });
+
+  const totalKm  = cycling.reduce((s,c) => s + c.d.km, 0);
+  const totalEl  = cycling.reduce((s,c) => s + c.d.el, 0);
+  const totalEff = cycling.reduce((s,c) => s + c.eff, 0);
+  const avgSpeed = cycling.reduce((s,c) => s + c.speed, 0) / cycling.length;
+  const maxKm    = Math.max(...cycling.map(c => c.d.km));
+  const maxEl    = Math.max(...cycling.map(c => c.d.el));
+  const maxEff   = Math.max(...cycling.map(c => c.eff));
+
+  function barChart(vals, max, unit, colorFn) {
+    return `<div style="display:flex;gap:6px;align-items:flex-end;height:150px;padding:0 4px;">
+      ${vals.map(v => {
+        const h = Math.round((v.value / max) * 100);
+        const col = colorFn ? colorFn(v.value) : '#56d364';
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;">
+          <div style="font-size:11px;font-weight:700;color:${col};margin-bottom:4px;white-space:nowrap;">${v.label}${unit?' '+unit:''}</div>
+          <div style="width:100%;background:${col};height:${h}%;border-radius:4px 4px 0 0;min-height:2px;transition:height .3s;"></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:6px;padding:6px 4px 0;border-top:1px solid #21262d;margin-top:6px;">
+      ${vals.map(v => `<div style="flex:1;text-align:center;font-size:11px;color:#8b949e;">${v.day}</div>`).join('')}
+    </div>`;
+  }
+
+  const kmBars = cycling.map(c => ({ day: c.d.date, label: c.d.km, value: c.d.km }));
+  const elBars = cycling.map(c => ({ day: c.d.date, label: c.d.el, value: c.d.el }));
+  const effBars = cycling.map(c => ({ day: c.d.date, label: Math.round(c.eff), value: c.eff }));
+  const spdBars = cycling.map(c => ({ day: c.d.date, label: c.speed.toFixed(1), value: c.speed }));
+
+  const kmColor = v => v < 70 ? '#56d364' : v < 95 ? '#79c0ff' : v < 105 ? '#ffa657' : '#ff7b72';
+  const elColor = v => v < 700 ? '#56d364' : v < 1000 ? '#79c0ff' : v < 1150 ? '#ffa657' : '#ff7b72';
+  const effColor = v => v < 70 ? '#56d364' : v < 100 ? '#79c0ff' : v < 110 ? '#ffa657' : '#ff7b72';
+  const spdColor = v => v < 12 ? '#56d364' : v < 14 ? '#79c0ff' : v < 16 ? '#ffa657' : '#ff7b72';
+
+  document.getElementById('tstat').innerHTML = `
+    <div class="sh">📊 Statystyki i wysiłek dzienny</div>
+
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:#8b949e;line-height:1.5;">
+      <strong style="color:#e6edf3;">Założenia:</strong> 8h pedałowania + 2h przerw = 10h dziennie.
+      <strong style="color:#ffa657;">Dzień 1</strong> ograniczony (start ~14:45 po pociągu, Fort Augustus max 19:00 przez godzinę zamknięcia restauracji).
+      <strong style="color:#ffa657;">Dzień 6</strong> ograniczony (Inverness max 17:00 — pakowanie rowerów + pociąg 18:52).
+      <br>
+      <strong style="color:#e6edf3;">"Effort km"</strong> to metryka łącząca dystans i przewyższenia: <code>km + m/100</code>.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px;">
+      <div class="stat-box"><div class="sv">${totalKm.toFixed(1)}</div><div class="sl">km łącznie</div></div>
+      <div class="stat-box"><div class="sv">${totalEl}</div><div class="sl">m przewyższenia</div></div>
+      <div class="stat-box"><div class="sv">${Math.round(totalEff)}</div><div class="sl">effort km</div></div>
+      <div class="stat-box"><div class="sv">${avgSpeed.toFixed(1)}</div><div class="sl">km/h średnio</div></div>
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">🚴 Kilometry dziennie</div>
+      ${barChart(kmBars, maxKm * 1.05, 'km', kmColor)}
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">⛰️ Przewyższenia dziennie (m)</div>
+      ${barChart(elBars, maxEl * 1.05, '', elColor)}
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">💪 Effort km (dystans + przewyższenia/100)</div>
+      ${barChart(effBars, maxEff * 1.05, '', effColor)}
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:24px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">⚡ Wymagane tempo (km/h w ruchu)</div>
+      ${barChart(spdBars, Math.max(...cycling.map(c=>c.speed))*1.1, '', spdColor)}
+      <div style="font-size:11px;color:#8b949e;margin-top:10px;line-height:1.5;padding-top:10px;border-top:1px solid #21262d;">
+        🟢 &lt;12 km/h spokojne · 🔵 12–14 solidne · 🟠 14–16 wysokie · 🔴 16+ trzeba się cisnąć
+      </div>
+    </div>
+
+    <div class="sh" style="margin-top:8px;">Rozpiska dzienna</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      ${cycling.map(c => `
+        <div class="card" style="padding:16px;border-left:4px solid ${c.diffCol};">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
+            <div>
+              <div style="font-weight:800;font-size:16px;">${c.d.ico} Etap ${c.cycleNum} · ${esc(c.d.title)}</div>
+              <div style="font-size:12px;color:#8b949e;margin-top:2px;">${c.d.date} · ${c.d.dow}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div class="badge" style="background:${c.diffCol}22;color:${c.diffCol};border:1px solid ${c.diffCol};">${c.diffLbl}</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+            <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:16px;font-weight:800;">${c.d.km}</div>
+              <div style="font-size:10px;color:#8b949e;">km</div>
+            </div>
+            <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:16px;font-weight:800;">${c.d.el}</div>
+              <div style="font-size:10px;color:#8b949e;">m ⛰️</div>
+            </div>
+            <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:16px;font-weight:800;">${Math.round(c.eff)}</div>
+              <div style="font-size:10px;color:#8b949e;">effort</div>
+            </div>
+            <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:16px;font-weight:800;color:${c.spdCol};">${c.speed.toFixed(1)}</div>
+              <div style="font-size:10px;color:#8b949e;">km/h</div>
+            </div>
+          </div>
+
+          <div style="background:#0d1117;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+              <div><span style="color:#8b949e;">Start:</span> <strong>${c.startTime}</strong> &nbsp;→&nbsp; <span style="color:#8b949e;">Meta:</span> <strong>${c.endTime}</strong></div>
+              <div style="color:#8b949e;font-size:12px;">okno ${c.totalWindow}h · w ruchu ${c.movingH}h</div>
+            </div>
+          </div>
+
+          <div style="font-size:12px;color:${c.spdCol};font-weight:600;margin-bottom:4px;">⚡ ${c.spdLbl}</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.5;">${esc(c.constraint)}</div>
+        </div>
+      `).join('')}
     </div>
   `;
 }
