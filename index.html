@@ -713,11 +713,20 @@ const DAYS = [
 ];
 
 // ===== INIT =====
+let snap = { content:'', tasks:'', pkgs:'', sights:'' };
+function snapOf(v) { try { return JSON.stringify(v); } catch { return ''; } }
+
 async function refreshAll() {
   await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights()]);
-  renderPlan(); renderTasks(); renderPack(); renderSights();
+  const nc = snapOf(content), nt = snapOf(tasks), np = snapOf(pkgs), ns = snapOf(sights);
+  if (nc !== snap.content || ns !== snap.sights) renderPlan();
+  if (nt !== snap.tasks) renderTasks();
+  if (np !== snap.pkgs) renderPack();
+  if (ns !== snap.sights) renderSights();
+  snap = { content:nc, tasks:nt, pkgs:np, sights:ns };
   if (document.getElementById('tst').style.display !== 'none') renderStart();
 }
+
 async function init() {
   updateSyncBadge();
   if (!me) { document.getElementById('umodal').style.display='flex'; }
@@ -732,17 +741,21 @@ async function init() {
   if (sOk && sights.length===0) await seedSights();
   renderSights();
   renderStart();
+  snap = { content:snapOf(content), tasks:snapOf(tasks), pkgs:snapOf(pkgs), sights:snapOf(sights) };
 
   await flushPending();
 
   setInterval(()=>{
-    if (document.getElementById('tst').style.display !== 'none') renderStart();
+    if (document.getElementById('tst').style.display !== 'none' && !document.hidden) renderStart();
   }, 1000);
   setInterval(async()=>{
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || document.hidden) return;
     await flushPending();
     await refreshAll();
-  }, 30000);
+  }, 60000);
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden && navigator.onLine) { await flushPending(); await refreshAll(); }
+  });
 }
 
 function selUser(u) {
