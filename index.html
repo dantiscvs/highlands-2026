@@ -109,7 +109,7 @@ tr:last-child td { border-bottom: none; }
       <span style="font-size:28px;line-height:1;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</span>
       <div style="min-width:0;">
         <div style="font-size:16px;font-weight:700;">Highlands 2026</div>
-        <div style="font-size:12px;color:#8b949e;">5–12 sierpnia · Inverness Loop · 533 km</div>
+        <div style="font-size:12px;color:#8b949e;">5–12 sierpnia · Inverness Loop · 512 km</div>
       </div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
@@ -356,8 +356,8 @@ tr:last-child td { border-bottom: none; }
   <div class="sh">💰 Kosztorys</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
     <div class="stat-box"><div class="sv">5 123</div><div class="sl">PLN / osoba łącznie</div></div>
-    <div class="stat-box"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
-    <div class="stat-box"><div class="sv">5 523</div><div class="sl">m przewyższenia</div></div>
+    <div class="stat-box"><div class="sv">512</div><div class="sl">km na rowerze</div></div>
+    <div class="stat-box"><div class="sv">5 795</div><div class="sl">m przewyższenia</div></div>
   </div>
 
   <div class="card" style="margin-bottom:20px;">
@@ -634,8 +634,8 @@ const DAYS = [
     day:3,date:'7.08',dow:'piątek',ico:'🚵',
     title:'Fort Augustus → Ratagan',
     desc:'Dzień 2. Przez Great Glen i Glen Shiel.',
-    km:103,el:1119,
-    mapEmbed:'https://mapy.com/s/mufalaluko',mapFull:'https://mapy.com/s/damahataba',
+    km:81.4,el:1191,
+    mapEmbed:'https://mapy.com/s/nenuvoluse',mapFull:'https://mapy.com/s/nemoneraka',
     gpx:'gpx/day2-fort-augustus-ratagan.gpx',
     acc:{name:'Ratagan Youth Hostel (SYHA)',
          url:'https://www.booking.com/hotel/gb/ratagan-youth-hostel-syha-hostelling-scotland.en-gb.html',
@@ -970,7 +970,7 @@ function renderStart() {
     <div class="hero">
       <div style="font-size:52px;line-height:1;margin-bottom:8px;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
       <div style="font-size:22px;font-weight:800;">Highlands 2026</div>
-      <div style="font-size:13px;color:#8b949e;margin-top:4px;">5 – 12 sierpnia · Inverness Loop · 533 km · 3 osoby</div>
+      <div style="font-size:13px;color:#8b949e;margin-top:4px;">5 – 12 sierpnia · Inverness Loop · 512 km · 3 osoby</div>
       <div style="margin-top:22px;">
         <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${cdLabel}</div>
         <div class="cd">
@@ -983,8 +983,8 @@ function renderStart() {
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
-      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
-      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">5 723</div><div class="sl">m przewyższenia</div></div>
+      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">512</div><div class="sl">km na rowerze</div></div>
+      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">5 795</div><div class="sl">m przewyższenia</div></div>
       <div class="stat-box" style="cursor:pointer;" onclick="goTab('budget')" title="Zobacz koszty"><div class="sv">5 123</div><div class="sl">PLN / osoba</div></div>
     </div>
 
@@ -1262,7 +1262,22 @@ function dayCard(d, idx, isOpen) {
     </div>`;
   }
 
-  // Zwiedzanie w tym dniu
+  // 1. Śniadanie
+  if (d.acc && d.acc.breakfast) {
+    const a = d.acc;
+    const bfKey = `day.${d.day}.breakfast`;
+    body += `<div class="irow"><div class="ico">🍳</div><div class="ilbl">Śniadanie</div>
+      <div>${a.breakfastUrl ? `<a href="${a.breakfastUrl}" target="_blank" rel="noopener">${ed(bfKey, a.breakfast)}</a>` : ed(bfKey, a.breakfast)}</div>
+    </div>`;
+  }
+
+  // 2. Sklep
+  if (d.shop) {
+    const sKey = `day.${d.day}.shop`;
+    body += `<div class="irow"><div class="ico">🛒</div><div class="ilbl">Sklep</div><div>${ed(sKey, d.shop)}</div></div>`;
+  }
+
+  // 3. Zwiedzanie w tym dniu
   const daySights = sights.filter(s=>s.day===d.day);
   if (daySights.length > 0) {
     body += `<div class="irow" style="border-top:1px solid #21262d;flex-direction:column;align-items:stretch;">
@@ -1285,7 +1300,15 @@ function dayCard(d, idx, isOpen) {
     </div>`;
   }
 
-  // Nocleg
+  // 4. Restauracja
+  if (d.rest) {
+    const rKey = `day.${d.day}.rest`;
+    body += `<div class="irow"><div class="ico">🍽️</div><div class="ilbl">Restauracja</div>
+      <div>${d.restUrl ? `<a href="${d.restUrl}" target="_blank" rel="noopener">${ed(rKey, d.rest)}</a>` : ed(rKey, d.rest)}</div>
+    </div>`;
+  }
+
+  // 5. Nocleg
   if (d.acc && d.acc.name) {
     const a = d.acc;
     const accKey = `day.${d.day}.acc.name`;
@@ -1296,26 +1319,6 @@ function dayCard(d, idx, isOpen) {
         ${a.url ? `<a href="${a.url}" target="_blank" rel="noopener" style="font-weight:600;">${ed(accKey, a.name)}</a>` : `<span style="font-weight:600;">${ed(accKey, a.name)}</span>`}
       </div>
     </div>`;
-    if (a.breakfast) {
-      const bfKey = `day.${d.day}.breakfast`;
-      body += `<div class="irow"><div class="ico">🍳</div><div class="ilbl">Śniadanie</div>
-        <div>${a.breakfastUrl ? `<a href="${a.breakfastUrl}" target="_blank" rel="noopener">${ed(bfKey, a.breakfast)}</a>` : ed(bfKey, a.breakfast)}</div>
-      </div>`;
-    }
-  }
-
-  // Restauracja
-  if (d.rest) {
-    const rKey = `day.${d.day}.rest`;
-    body += `<div class="irow"><div class="ico">🍽️</div><div class="ilbl">Restauracja</div>
-      <div>${d.restUrl ? `<a href="${d.restUrl}" target="_blank" rel="noopener">${ed(rKey, d.rest)}</a>` : ed(rKey, d.rest)}</div>
-    </div>`;
-  }
-
-  // Sklep
-  if (d.shop) {
-    const sKey = `day.${d.day}.shop`;
-    body += `<div class="irow"><div class="ico">🛒</div><div class="ilbl">Sklep</div><div>${ed(sKey, d.shop)}</div></div>`;
   }
 
   // Uwagi — zawsze widoczne (edytowalne)
