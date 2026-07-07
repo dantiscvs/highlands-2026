@@ -2,8 +2,15 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Highlands 2026</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Highlands">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -103,6 +110,7 @@ tr:last-child td { border-bottom: none; }
       </div>
     </div>
     <div style="display:flex;gap:6px;align-items:center;">
+      <span id="syncBadge" style="display:none;font-size:11px;font-weight:600;padding:4px 8px;border-radius:6px;background:#21262d;border:1px solid #30363d;"></span>
       <button id="editToggle" class="btn btn-sm" onclick="toggleEdit()" title="Edytuj tekstowe pola">✏️</button>
       <button onclick="document.getElementById('umodal').style.display='flex'" id="ubadge" class="btn btn-sm">👤 —</button>
     </div>
@@ -458,6 +466,54 @@ const SB_URL = 'https://axbgkvswfzsrvtvjrskh.supabase.co';
 const SB_KEY = 'sb_publishable_fLytrxqd7-8T79l-YA9xig_ZAw7c2oN';
 const db = supabase.createClient(SB_URL, SB_KEY);
 
+// ===== OFFLINE CACHE + WRITE QUEUE =====
+const CK = { tasks:'hlds_c_tasks', pkgs:'hlds_c_pkgs', sights:'hlds_c_sights', content:'hlds_c_content' };
+const PENDING_KEY = 'hlds_pending';
+function cacheGet(key, def) { try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v!==null ? v : def; } catch { return def; } }
+function cacheSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+function uuid() { return crypto.randomUUID ? crypto.randomUUID() : ('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random()*16|0; return (c==='x'?r:(r&0x3|0x8)).toString(16); })); }
+
+function queueWrite(op) {
+  const q = cacheGet(PENDING_KEY, []);
+  q.push({ ...op, ts: Date.now() });
+  cacheSet(PENDING_KEY, q);
+  updateSyncBadge();
+}
+async function flushPending() {
+  const q = cacheGet(PENDING_KEY, []);
+  if (!q.length || !navigator.onLine) return;
+  const remaining = [];
+  for (const item of q) {
+    try {
+      if (item.op === 'update') { const r = await db.from(item.table).update(item.data).eq('id', item.id); if (r.error) throw r.error; }
+      else if (item.op === 'insert') { const r = await db.from(item.table).insert(item.data); if (r.error) throw r.error; }
+      else if (item.op === 'upsert') { const r = await db.from(item.table).upsert(item.data); if (r.error) throw r.error; }
+      else if (item.op === 'delete') { const r = await db.from(item.table).delete().eq('id', item.id); if (r.error) throw r.error; }
+    } catch (e) { remaining.push(item); console.warn('flushPending item failed:', e); break; }
+  }
+  cacheSet(PENDING_KEY, remaining);
+  updateSyncBadge();
+}
+function updateSyncBadge() {
+  const b = document.getElementById('syncBadge');
+  if (!b) return;
+  const pending = cacheGet(PENDING_KEY, []).length;
+  const online = navigator.onLine;
+  if (online && pending === 0) { b.style.display = 'none'; return; }
+  b.style.display = 'inline-flex';
+  if (!online) { b.innerHTML = '<span style="color:#ff7b72;">● offline</span>' + (pending?` · ${pending}`:''); b.style.borderColor='#5e0d0d'; }
+  else if (pending) { b.innerHTML = `<span style="color:#ffa657;">↻ ${pending} do sync</span>`; b.style.borderColor='#5a2800'; }
+}
+window.addEventListener('online', async () => { updateSyncBadge(); await flushPending(); await refreshAll(); });
+window.addEventListener('offline', updateSyncBadge);
+
+// PWA install
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW register:', e));
+  });
+}
+
 let me = localStorage.getItem('hlds_user');
 let chk = {};
 let pkgs = [];
@@ -657,27 +713,35 @@ const DAYS = [
 ];
 
 // ===== INIT =====
+async function refreshAll() {
+  await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights()]);
+  renderPlan(); renderTasks(); renderPack(); renderSights();
+  if (document.getElementById('tst').style.display !== 'none') renderStart();
+}
 async function init() {
+  updateSyncBadge();
   if (!me) { document.getElementById('umodal').style.display='flex'; }
   else { document.getElementById('umodal').style.display='none'; updBadge(); }
-  await loadContent();
+
+  const [cOk, tOk, pOk, sOk] = await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights()]);
   renderPlan();
-  await loadTasks(); if (tasks.length===0) await seedTasks();
+  if (tOk && tasks.length===0) await seedTasks();
   renderTasks();
-  await loadPkg(); if (pkgs.length===0) await seedPkg();
+  if (pOk && pkgs.length===0) await seedPkg();
   renderPack();
-  await loadSights(); if (sights.length===0) await seedSights();
+  if (sOk && sights.length===0) await seedSights();
   renderSights();
   renderStart();
+
+  await flushPending();
+
   setInterval(()=>{
     if (document.getElementById('tst').style.display !== 'none') renderStart();
   }, 1000);
   setInterval(async()=>{
-    await loadTasks(); renderTasks();
-    await loadPkg(); renderPack();
-    await loadSights(); renderSights();
-    await loadContent(); applyContent();
-    if (document.getElementById('tst').style.display !== 'none') renderStart();
+    if (!navigator.onLine) return;
+    await flushPending();
+    await refreshAll();
   }, 30000);
 }
 
@@ -826,12 +890,15 @@ function renderStart() {
 
 // ===== CONTENT (editable overrides) =====
 async function loadContent() {
+  content = cacheGet(CK.content, {});
   try {
     const {data,error}=await db.from('content').select('*');
     if(error) throw error;
     content={};
     (data||[]).forEach(r=>{content[r.id]=r.value;});
-  } catch(e){ console.warn('loadContent:',e.message); }
+    cacheSet(CK.content, content);
+    return true;
+  } catch(e){ console.warn('loadContent (cache):',e.message); return false; }
 }
 function ov(key, fallback){ return content[key]!==undefined ? content[key] : fallback; }
 function applyContent() {
@@ -842,8 +909,10 @@ function applyContent() {
 }
 async function saveField(key, value) {
   content[key]=value;
-  try { await db.from('content').upsert({id:key,value:value,updated_at:new Date().toISOString()}); }
-  catch(e){ console.warn('saveField:',e); }
+  cacheSet(CK.content, content);
+  const payload = {id:key,value:value,updated_at:new Date().toISOString()};
+  try { const r = await db.from('content').upsert(payload); if(r.error) throw r.error; }
+  catch(e){ console.warn('saveField (queued):',e.message); queueWrite({table:'content', op:'upsert', data:payload}); }
 }
 
 function toggleEdit() {
@@ -999,42 +1068,42 @@ function dayCard(d, idx) {
 
 // ===== TASKS (moved to supabase) =====
 async function loadTasks() {
+  tasks = cacheGet(CK.tasks, []);
   try {
     const {data,error}=await db.from('tasks').select('*').order('order_index').order('created_at');
     if(error) throw error;
     tasks=data||[];
-  } catch(e){ console.warn('loadTasks:',e.message); }
+    cacheSet(CK.tasks, tasks);
+    return true;
+  } catch(e){ console.warn('loadTasks (cache):',e.message); return false; }
 }
 async function seedTasks() {
-  try {
-    const items=DEFAULT_TASKS.map((t,i)=>({title:t.title,icon:t.icon,order_index:i,dan_checked:false,kuba_checked:false,maciek_checked:false}));
-    await db.from('tasks').insert(items);
-    await loadTasks();
-  } catch(e){ console.warn('seedTasks:',e); }
+  const items=DEFAULT_TASKS.map((t,i)=>({id:uuid(),title:t.title,icon:t.icon,order_index:i,dan_checked:false,kuba_checked:false,maciek_checked:false}));
+  tasks=items; cacheSet(CK.tasks, tasks);
+  try { const r=await db.from('tasks').insert(items); if(r.error) throw r.error; }
+  catch(e){ console.warn('seedTasks (queued):',e.message); items.forEach(i=>queueWrite({table:'tasks',op:'insert',data:i})); }
 }
 async function addTask() {
   const inp=document.getElementById('newtask');
-  const title=inp.value.trim();
-  if(!title) return;
+  const title=inp.value.trim(); if(!title) return;
   inp.value='';
-  try {
-    const {data}=await db.from('tasks').insert({title,icon:'📌',order_index:9999,dan_checked:false,kuba_checked:false,maciek_checked:false}).select();
-    if(data) tasks.push(data[0]);
-    renderTasks();
-  } catch(e){ console.warn('addTask:',e); }
+  const item={id:uuid(),title,icon:'📌',order_index:9999,dan_checked:false,kuba_checked:false,maciek_checked:false};
+  tasks.push(item); cacheSet(CK.tasks, tasks); renderTasks();
+  try { const r=await db.from('tasks').insert(item); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'tasks',op:'insert',data:item}); }
 }
 async function togTask(id) {
   if(!me){ alert('Wybierz najpierw swoje imię'); return; }
   const t=tasks.find(x=>x.id===id); if(!t) return;
   const f=me+'_checked';
-  t[f]=!t[f]; renderTasks();
-  try { await db.from('tasks').update({[f]:t[f]}).eq('id',id); }
-  catch(e){ console.warn('togTask:',e); }
+  t[f]=!t[f]; cacheSet(CK.tasks, tasks); renderTasks();
+  try { const r=await db.from('tasks').update({[f]:t[f]}).eq('id',id); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'tasks',op:'update',id,data:{[f]:t[f]}}); }
 }
 async function delTask(id) {
-  tasks=tasks.filter(t=>t.id!==id); renderTasks();
-  try { await db.from('tasks').delete().eq('id',id); }
-  catch(e){ console.warn('delTask:',e); }
+  tasks=tasks.filter(t=>t.id!==id); cacheSet(CK.tasks, tasks); renderTasks();
+  try { const r=await db.from('tasks').delete().eq('id',id); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'tasks',op:'delete',id}); }
 }
 function renderTasks() {
   const c=document.getElementById('tasklist'); if(!c) return;
@@ -1060,41 +1129,42 @@ function renderTasks() {
 
 // ===== PACKING =====
 async function loadPkg() {
+  pkgs = cacheGet(CK.pkgs, []);
   try {
     const {data,error}=await db.from('packing_items').select('*').order('order_index').order('created_at');
     if(error) throw error;
     pkgs=data||[];
-  } catch(e){ console.warn('loadPkg:',e.message); }
+    cacheSet(CK.pkgs, pkgs);
+    return true;
+  } catch(e){ console.warn('loadPkg (cache):',e.message); return false; }
 }
 async function seedPkg() {
-  try {
-    const items=DEFAULT_PKG.map((title,i)=>({title,order_index:i,dan_checked:false,kuba_checked:false,maciek_checked:false}));
-    await db.from('packing_items').insert(items);
-    await loadPkg();
-  } catch(e){ console.warn('seedPkg:',e); }
+  const items=DEFAULT_PKG.map((title,i)=>({id:uuid(),title,order_index:i,dan_checked:false,kuba_checked:false,maciek_checked:false}));
+  pkgs=items; cacheSet(CK.pkgs, pkgs);
+  try { const r=await db.from('packing_items').insert(items); if(r.error) throw r.error; }
+  catch(e){ console.warn('seedPkg (queued):',e.message); items.forEach(i=>queueWrite({table:'packing_items',op:'insert',data:i})); }
 }
 async function addItem() {
   const inp=document.getElementById('newitem');
   const title=inp.value.trim(); if(!title) return;
   inp.value='';
-  try {
-    const {data}=await db.from('packing_items').insert({title,order_index:9999,dan_checked:false,kuba_checked:false,maciek_checked:false}).select();
-    if(data) pkgs.push(data[0]);
-    renderPack();
-  } catch(e){ console.warn('addItem:',e); }
+  const item={id:uuid(),title,order_index:9999,dan_checked:false,kuba_checked:false,maciek_checked:false};
+  pkgs.push(item); cacheSet(CK.pkgs, pkgs); renderPack();
+  try { const r=await db.from('packing_items').insert(item); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'packing_items',op:'insert',data:item}); }
 }
 async function togPkg(id) {
   if(!me){alert('Wybierz najpierw swoje imię');return;}
   const item=pkgs.find(i=>i.id===id); if(!item) return;
   const f=me+'_checked';
-  item[f]=!item[f]; renderPack();
-  try { await db.from('packing_items').update({[f]:item[f]}).eq('id',id); }
-  catch(e){ console.warn('togPkg:',e); }
+  item[f]=!item[f]; cacheSet(CK.pkgs, pkgs); renderPack();
+  try { const r=await db.from('packing_items').update({[f]:item[f]}).eq('id',id); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'packing_items',op:'update',id,data:{[f]:item[f]}}); }
 }
 async function delItem(id) {
-  pkgs=pkgs.filter(i=>i.id!==id); renderPack();
-  try { await db.from('packing_items').delete().eq('id',id); }
-  catch(e){ console.warn('delItem:',e); }
+  pkgs=pkgs.filter(i=>i.id!==id); cacheSet(CK.pkgs, pkgs); renderPack();
+  try { const r=await db.from('packing_items').delete().eq('id',id); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'packing_items',op:'delete',id}); }
 }
 function renderPack() {
   const c=document.getElementById('packlist'); if(!c) return;
@@ -1119,18 +1189,20 @@ function renderPack() {
 
 // ===== SIGHTS =====
 async function loadSights() {
+  sights = cacheGet(CK.sights, []);
   try {
     const {data,error}=await db.from('sights').select('*').order('day').order('order_index').order('created_at');
     if(error) throw error;
     sights=data||[];
-  } catch(e){ console.warn('loadSights:',e.message); }
+    cacheSet(CK.sights, sights);
+    return true;
+  } catch(e){ console.warn('loadSights (cache):',e.message); return false; }
 }
 async function seedSights() {
-  try {
-    const items=DEFAULT_SIGHTS.map((s,i)=>({day:s.day,name:s.name,icon:s.icon,description:s.desc,url:s.url,order_index:i}));
-    await db.from('sights').insert(items);
-    await loadSights();
-  } catch(e){ console.warn('seedSights:',e); }
+  const items=DEFAULT_SIGHTS.map((s,i)=>({id:uuid(),day:s.day,name:s.name,icon:s.icon,description:s.desc,url:s.url,order_index:i}));
+  sights=items; cacheSet(CK.sights, sights);
+  try { const r=await db.from('sights').insert(items); if(r.error) throw r.error; }
+  catch(e){ console.warn('seedSights (queued):',e.message); items.forEach(i=>queueWrite({table:'sights',op:'insert',data:i})); }
 }
 function openSightModal() { document.getElementById('sightModal').style.display='flex'; }
 function closeSightModal() {
@@ -1145,18 +1217,19 @@ async function saveSight() {
   const url=document.getElementById('smUrl').value.trim();
   const image_url=document.getElementById('smImg').value.trim();
   if(!name) { alert('Podaj nazwę'); return; }
-  try {
-    const {data}=await db.from('sights').insert({day,name,icon,description,url,image_url,order_index:9999}).select();
-    if(data) sights.push(data[0]);
-    closeSightModal(); renderSights(); renderPlan();
-  } catch(e){ console.warn('saveSight:',e); alert('Błąd zapisu'); }
+  const item={id:uuid(),day,name,icon,description,url,image_url,order_index:9999};
+  sights.push(item); cacheSet(CK.sights, sights);
+  closeSightModal(); renderSights(); renderPlan();
+  try { const r=await db.from('sights').insert(item); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'sights',op:'insert',data:item}); }
 }
 async function delSight(id) {
   if(!confirm('Usunąć to miejsce?')) return;
   sights=sights.filter(s=>s.id!==id);
+  cacheSet(CK.sights, sights);
   renderSights(); renderPlan();
-  try { await db.from('sights').delete().eq('id',id); }
-  catch(e){ console.warn('delSight:',e); }
+  try { const r=await db.from('sights').delete().eq('id',id); if(r.error) throw r.error; }
+  catch(e){ queueWrite({table:'sights',op:'delete',id}); }
 }
 function renderSights() {
   const c=document.getElementById('sightsList'); if(!c) return;
