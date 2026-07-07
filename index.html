@@ -64,7 +64,17 @@ tr:last-child td { border-bottom: none; }
 .sight-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px; display: flex; gap: 12px; align-items: flex-start; }
 .sight-thumb { width: 60px; height: 60px; border-radius: 8px; background: #21262d; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0; }
 .sight-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-@media(max-width:500px){.tt{font-size:22px;}.stat-box{padding:8px;}.sv{font-size:17px;}.tab{padding:10px 12px;font-size:12px;}}
+[data-edit].note-empty:empty::before { content: '— dodaj uwagi —'; color: #6b7280; font-style: italic; }
+.hero { background: linear-gradient(135deg,#161b22 0%,#0d1f14 100%); border: 1px solid #30363d; border-radius: 16px; padding: 28px 24px; text-align: center; margin-bottom: 20px; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 80% 20%, rgba(86,211,100,0.15), transparent 50%); pointer-events: none; }
+.cd { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 18px; position: relative; }
+.cd-box { background: rgba(13,17,23,0.6); border: 1px solid #30363d; border-radius: 10px; padding: 10px 6px; }
+.cd-v { font-size: 26px; font-weight: 800; color: #56d364; line-height: 1; }
+.cd-l { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+.pbar { height: 8px; background: #21262d; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.pbar > div { height: 100%; background: linear-gradient(to right,#238636,#56d364); border-radius: 4px; transition: width .3s; }
+.next-card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+@media(max-width:500px){.tt{font-size:22px;}.stat-box{padding:8px;}.sv{font-size:17px;}.tab{padding:10px 12px;font-size:12px;}.cd-v{font-size:20px;}}
 </style>
 </head>
 <body>
@@ -100,7 +110,8 @@ tr:last-child td { border-bottom: none; }
 
 <nav style="position:sticky;top:63px;z-index:98;">
   <div style="max-width:940px;margin:0 auto;display:flex;">
-    <button class="tab on" onclick="goTab('plan',this)">📅 Plan</button>
+    <button class="tab on" onclick="goTab('start',this)">🏠 Start</button>
+    <button class="tab" onclick="goTab('plan',this)">📅 Plan</button>
     <button class="tab" onclick="goTab('sights',this)">🏰 Zwiedzanie</button>
     <button class="tab" onclick="goTab('flights',this)">✈️ Loty</button>
     <button class="tab" onclick="goTab('train',this)">🚂 Pociągi</button>
@@ -114,7 +125,9 @@ tr:last-child td { border-bottom: none; }
 
 <main style="max-width:940px;margin:0 auto;padding:20px 16px 80px;">
 
-<div id="tp"></div>
+<div id="tst"></div>
+
+<div id="tp" style="display:none;"></div>
 
 <div id="ts" style="display:none;">
   <div class="sh">🏰 Zwiedzanie na trasie</div>
@@ -324,7 +337,7 @@ tr:last-child td { border-bottom: none; }
 <div id="tb" style="display:none;">
   <div class="sh">💰 Kosztorys</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;">
-    <div class="stat-box"><div class="sv">5 245</div><div class="sl">PLN / osoba łącznie</div></div>
+    <div class="stat-box"><div class="sv">5 123</div><div class="sl">PLN / osoba łącznie</div></div>
     <div class="stat-box"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
     <div class="stat-box"><div class="sv">5 523</div><div class="sl">m przewyższenia</div></div>
   </div>
@@ -341,8 +354,8 @@ tr:last-child td { border-bottom: none; }
         <tr><td>Chilly Winston do Edi (11.08)</td><td style="text-align:right;color:#ffa657;font-weight:600;">~117 zł</td><td style="text-align:right;color:#8b949e;">70 GBP</td></tr>
         <tr><td>2 noclegi w Edynburgu</td><td style="text-align:right;color:#56d364;font-weight:600;">0 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
         <tr><td>Karton / walizka na rower</td><td style="text-align:right;color:#ffa657;font-weight:600;">280 zł</td><td style="text-align:right;color:#8b949e;">840 zł*</td></tr>
-        <tr><td>Jedzenie (50 GBP/os/dzień × 7 dni)</td><td style="text-align:right;color:#56d364;font-weight:600;">1 400 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
-        <tr style="font-weight:700;font-size:15px;background:#0d1117;"><td>RAZEM</td><td style="text-align:right;color:#ffa657;">5 245 zł</td><td style="text-align:right;"></td></tr>
+        <tr><td>Jedzenie (50 GBP/os/dzień × 7 dni)</td><td style="text-align:right;color:#ffa657;font-weight:600;">1 700 zł</td><td style="text-align:right;color:#8b949e;">—</td></tr>
+        <tr style="font-weight:700;font-size:15px;background:#0d1117;"><td>RAZEM</td><td style="text-align:right;color:#ffa657;">5 123 zł</td><td style="text-align:right;"></td></tr>
       </tbody>
     </table>
     <div style="padding:10px 16px;font-size:11px;color:#8b949e;background:#0d1117;border-top:1px solid #21262d;">
@@ -548,7 +561,7 @@ const DAYS = [
     rest:'Highland Hideout (8pm) · Beaufort House PIZZA (8:30pm)',
     restUrl:'https://maps.app.goo.gl/ZhBdxHWQx87woLRL7',
     shop:null,
-    notes:null,
+    notes:'⏰ Wcześnie wstać żeby zmontować rowery i zrobić zakupy w Lidlu w Musselburgh. Dojazd do centrum Edynburga ok. 30 min rowerem — być na stacji Waverley o 9:50 żeby odebrać bilety z biletomatu i ogarnąć peron.',
   },
   {
     day:3,date:'7.08',dow:'piątek',ico:'🚵',
@@ -654,11 +667,16 @@ async function init() {
   renderPack();
   await loadSights(); if (sights.length===0) await seedSights();
   renderSights();
+  renderStart();
+  setInterval(()=>{
+    if (document.getElementById('tst').style.display !== 'none') renderStart();
+  }, 1000);
   setInterval(async()=>{
     await loadTasks(); renderTasks();
     await loadPkg(); renderPack();
     await loadSights(); renderSights();
     await loadContent(); applyContent();
+    if (document.getElementById('tst').style.display !== 'none') renderStart();
   }, 30000);
 }
 
@@ -676,12 +694,133 @@ function updBadge() {
 
 // ===== TABS =====
 function goTab(name, btn) {
-  const map={plan:'tp',sights:'ts',flights:'tf',train:'tt',budget:'tb',tasks:'tts',packing:'tpk'};
+  const map={start:'tst',plan:'tp',sights:'ts',flights:'tf',train:'tt',budget:'tb',tasks:'tts',packing:'tpk'};
   Object.values(map).forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById(map[name]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
+  if(name==='start') renderStart();
   window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ===== START =====
+function renderStart() {
+  const now = new Date();
+  const trip = new Date('2026-08-05T19:25:00');
+  const returnDate = new Date('2026-08-12T21:20:00');
+  const diff = trip - now;
+  const past = diff < 0;
+  const active = now >= trip && now <= returnDate;
+
+  const days = Math.floor(Math.abs(diff)/86400000);
+  const hrs = Math.floor((Math.abs(diff)%86400000)/3600000);
+  const mins = Math.floor((Math.abs(diff)%3600000)/60000);
+  const secs = Math.floor((Math.abs(diff)%60000)/1000);
+
+  const cdLabel = active ? 'Wyprawa w toku!' : (past ? 'Wyprawa zakończona' : 'Do wyjazdu zostało');
+
+  const tasksAll = tasks.length * 3;
+  const tasksDone = tasks.reduce((sum,t)=>sum + (t.dan_checked?1:0)+(t.kuba_checked?1:0)+(t.maciek_checked?1:0), 0);
+  const pkgAll = pkgs.length * 3;
+  const pkgDone = pkgs.reduce((sum,i)=>sum + (i.dan_checked?1:0)+(i.kuba_checked?1:0)+(i.maciek_checked?1:0), 0);
+  const tPct = tasksAll ? Math.round(tasksDone/tasksAll*100) : 0;
+  const pPct = pkgAll ? Math.round(pkgDone/pkgAll*100) : 0;
+
+  // per-person progress
+  const perPerson = PS.map(p=>{
+    const tD = tasks.filter(t=>t[p+'_checked']).length;
+    const pD = pkgs.filter(i=>i[p+'_checked']).length;
+    return {p, tD, tT: tasks.length, pD, pT: pkgs.length};
+  });
+
+  // next day
+  let nextDay = null;
+  if (!past) {
+    const dayDates = [
+      {i:0, d: new Date('2026-08-05')},
+      {i:1, d: new Date('2026-08-06')},
+      {i:2, d: new Date('2026-08-07')},
+      {i:3, d: new Date('2026-08-08')},
+      {i:4, d: new Date('2026-08-09')},
+      {i:5, d: new Date('2026-08-10')},
+      {i:6, d: new Date('2026-08-11')},
+      {i:7, d: new Date('2026-08-12')},
+    ];
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const upcoming = dayDates.find(dd => dd.d >= today);
+    if (upcoming) nextDay = DAYS[upcoming.i];
+  }
+
+  document.getElementById('tst').innerHTML = `
+    <div class="hero">
+      <div style="font-size:52px;line-height:1;margin-bottom:8px;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
+      <div style="font-size:22px;font-weight:800;">Highlands 2026</div>
+      <div style="font-size:13px;color:#8b949e;margin-top:4px;">5 – 12 sierpnia · Inverness Loop · 533 km · 3 osoby</div>
+      <div style="margin-top:22px;">
+        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${cdLabel}</div>
+        <div class="cd">
+          <div class="cd-box"><div class="cd-v">${days}</div><div class="cd-l">${days===1?'dzień':'dni'}</div></div>
+          <div class="cd-box"><div class="cd-v">${hrs}</div><div class="cd-l">godz</div></div>
+          <div class="cd-box"><div class="cd-v">${mins}</div><div class="cd-l">min</div></div>
+          <div class="cd-box"><div class="cd-v">${secs}</div><div class="cd-l">sek</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+      <div class="stat-box"><div class="sv">533</div><div class="sl">km na rowerze</div></div>
+      <div class="stat-box"><div class="sv">5 523</div><div class="sl">m przewyższenia</div></div>
+      <div class="stat-box"><div class="sv">5 123</div><div class="sl">PLN / osoba</div></div>
+    </div>
+
+    ${nextDay ? `
+    <div class="next-card">
+      <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Następny etap</div>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <div style="font-size:32px;">${nextDay.ico}</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:15px;">${esc(nextDay.title)}</div>
+          <div style="font-size:12px;color:#8b949e;">${nextDay.date} · ${nextDay.dow}</div>
+        </div>
+        <button class="btn btn-sm" onclick="goTab('plan',document.querySelector('.tab:nth-child(2)'))">Zobacz →</button>
+      </div>
+    </div>` : ''}
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;">✅ Postęp zadań <span style="color:#8b949e;font-weight:500;font-size:12px;margin-left:auto;">${tasksDone}/${tasksAll}</span></div>
+      <div class="pbar"><div style="width:${tPct}%;"></div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;">
+        ${perPerson.map(pp=>`
+          <div style="text-align:center;padding:8px;background:#0d1117;border-radius:8px;border:1px solid #21262d;">
+            <div style="font-size:11px;color:${PC[pp.p]};font-weight:700;">${PL[pp.p]}</div>
+            <div style="font-size:16px;font-weight:800;margin-top:2px;">${pp.tD}/${pp.tT}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;">🎒 Postęp pakowania <span style="color:#8b949e;font-weight:500;font-size:12px;margin-left:auto;">${pkgDone}/${pkgAll}</span></div>
+      <div class="pbar"><div style="width:${pPct}%;"></div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;">
+        ${perPerson.map(pp=>`
+          <div style="text-align:center;padding:8px;background:#0d1117;border-radius:8px;border:1px solid #21262d;">
+            <div style="font-size:11px;color:${PC[pp.p]};font-weight:700;">${PL[pp.p]}</div>
+            <div style="font-size:16px;font-weight:800;margin-top:2px;">${pp.pD}/${pp.pT}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+      <button class="btn" onclick="goTab('plan',document.querySelector('.tab:nth-child(2)'))" style="justify-content:center;padding:14px;">📅 Plan</button>
+      <button class="btn" onclick="goTab('sights',document.querySelector('.tab:nth-child(3)'))" style="justify-content:center;padding:14px;">🏰 Zwiedzanie</button>
+      <button class="btn" onclick="goTab('flights',document.querySelector('.tab:nth-child(4)'))" style="justify-content:center;padding:14px;">✈️ Loty</button>
+      <button class="btn" onclick="goTab('train',document.querySelector('.tab:nth-child(5)'))" style="justify-content:center;padding:14px;">🚂 Pociągi</button>
+      <button class="btn" onclick="goTab('budget',document.querySelector('.tab:nth-child(6)'))" style="justify-content:center;padding:14px;">💰 Koszty</button>
+      <button class="btn" onclick="goTab('tasks',document.querySelector('.tab:nth-child(7)'))" style="justify-content:center;padding:14px;">✅ Zadania</button>
+    </div>
+  `;
 }
 
 // ===== CONTENT (editable overrides) =====
@@ -820,16 +959,15 @@ function dayCard(d, idx) {
     body += `<div class="irow"><div class="ico">🛒</div><div class="ilbl">Sklep</div><div>${ed(sKey, d.shop)}</div></div>`;
   }
 
-  // Uwagi
+  // Uwagi — zawsze widoczne (edytowalne)
   const noteKey = `day.${d.day}.notes`;
   const noteVal = ov(noteKey, d.notes);
-  if (noteVal || editMode) {
-    body += `<div class="irow" style="border-top:1px solid #21262d;">
-      <div class="ico">📝</div>
-      <div class="ilbl">Uwagi</div>
-      <div style="flex:1;color:#ffa657;white-space:pre-wrap;">${ed(noteKey, noteVal || '')}</div>
-    </div>`;
-  }
+  const emptyCls = (!noteVal) ? ' note-empty' : '';
+  body += `<div class="irow" style="border-top:1px solid #21262d;">
+    <div class="ico">📝</div>
+    <div class="ilbl">Uwagi</div>
+    <div style="flex:1;color:#ffa657;white-space:pre-wrap;"><span data-edit="${noteKey}" class="${emptyCls}">${esc(noteVal||'')}</span></div>
+  </div>`;
 
   const titleKey = `day.${d.day}.title`;
   const descKey = `day.${d.day}.desc`;
