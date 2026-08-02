@@ -125,6 +125,7 @@ tr:last-child td { border-bottom: none; }
   <div style="max-width:940px;margin:0 auto;display:flex;">
     <button class="tab on" data-tab="start" onclick="goTab('start')">🏠 Start</button>
     <button class="tab" data-tab="plan" onclick="goTab('plan')">📅 Plan</button>
+    <button class="tab" data-tab="today" onclick="goTab('today')">🎯 Dziś</button>
     <button class="tab" data-tab="stats" onclick="goTab('stats')">📊 Statystyki</button>
     <button class="tab" data-tab="sights" onclick="goTab('sights')">🏰 Zwiedzanie</button>
     <button class="tab" data-tab="weather" onclick="goTab('weather')">🌤️ Pogoda</button>
@@ -132,6 +133,7 @@ tr:last-child td { border-bottom: none; }
     <button class="tab" data-tab="train" onclick="goTab('train')">🚂 Pociągi</button>
     <button class="tab" data-tab="noclegi" onclick="goTab('noclegi')">🏠 Noclegi</button>
     <button class="tab" data-tab="budget" onclick="goTab('budget')">💰 Koszty</button>
+    <button class="tab" data-tab="expenses" onclick="goTab('expenses')">💸 Wydatki</button>
     <button class="tab" data-tab="tasks" onclick="goTab('tasks')">✅ Zadania</button>
     <button class="tab" data-tab="packing" onclick="goTab('packing')">🎒 Pakowanie</button>
   </div>
@@ -146,6 +148,8 @@ tr:last-child td { border-bottom: none; }
 <div id="tp" style="display:none;"></div>
 
 <div id="tstat" style="display:none;"></div>
+
+<div id="ttoday" style="display:none;"></div>
 
 <div id="ts" style="display:none;">
   <div class="sh">🏰 Zwiedzanie na trasie</div>
@@ -410,6 +414,8 @@ tr:last-child td { border-bottom: none; }
   </div>
 </div>
 
+<div id="texp" style="display:none;"></div>
+
 <div id="tts" style="display:none;">
   <div class="sh">✅ Zadania przed wyjazdem</div>
   <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Każdy odznacza swoje zadania. Możesz dodawać nowe.</p>
@@ -465,7 +471,7 @@ const SB_KEY = 'sb_publishable_fLytrxqd7-8T79l-YA9xig_ZAw7c2oN';
 const db = supabase.createClient(SB_URL, SB_KEY);
 
 // ===== OFFLINE CACHE + WRITE QUEUE =====
-const CK = { tasks:'hlds_c_tasks', pkgs:'hlds_c_pkgs', sights:'hlds_c_sights', content:'hlds_c_content' };
+const CK = { tasks:'hlds_c_tasks', pkgs:'hlds_c_pkgs', sights:'hlds_c_sights', content:'hlds_c_content', expenses:'hlds_c_expenses' };
 const PENDING_KEY = 'hlds_pending';
 function cacheGet(key, def) { try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v!==null ? v : def; } catch { return def; } }
 function cacheSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
@@ -753,12 +759,12 @@ async function wxEnsureData(idx, force) {
   if ((force || !fresh)) {
     if (!navigator.onLine) { wxOfflineBlocked = true; return cached; }
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=temperature_2m,apparent_temperature,dew_point_2m,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,wind_gusts_10m,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset&timezone=auto&forecast_days=16&models=${wxModel}`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=temperature_2m,apparent_temperature,dew_point_2m,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,wind_gusts_10m,wind_direction_10m,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset&timezone=auto&forecast_days=16&models=${wxModel}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
       const H = json.hourly;
-      ['temperature_2m','apparent_temperature','dew_point_2m','precipitation','relative_humidity_2m','pressure_msl','wind_speed_10m','wind_gusts_10m','cloud_cover_low','cloud_cover_mid','cloud_cover_high','visibility'].forEach(k => { if (H[k]) H[k] = fillNulls(H[k]); });
+      ['temperature_2m','apparent_temperature','dew_point_2m','precipitation','relative_humidity_2m','pressure_msl','wind_speed_10m','wind_gusts_10m','wind_direction_10m','cloud_cover_low','cloud_cover_mid','cloud_cover_high','visibility'].forEach(k => { if (H[k]) H[k] = fillNulls(H[k]); });
       cached = { fetchedAt: Date.now(), hourly: H, daily: json.daily };
       cacheSet(cacheKey, cached);
     } catch(e) { console.warn('wxEnsureData:', e.message); if (!cached) return null; }
@@ -1047,6 +1053,221 @@ function renderWeatherUI(data, loc) {
   `;
 }
 
+// ===== GPX / GEO / WIND =====
+function haversineKm(lat1,lon1,lat2,lon2) {
+  const R=6371, toRad=x=>x*Math.PI/180;
+  const dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function bearingDeg(lat1,lon1,lat2,lon2) {
+  const toRad=x=>x*Math.PI/180, toDeg=x=>x*180/Math.PI;
+  const phi1=toRad(lat1), phi2=toRad(lat2), dLon=toRad(lon2-lon1);
+  const y=Math.sin(dLon)*Math.cos(phi2);
+  const x=Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(dLon);
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+function routeBearing(pts) {
+  let sx=0, sy=0;
+  for (let i=1;i<pts.length;i++) {
+    const d = haversineKm(pts[i-1].lat,pts[i-1].lon,pts[i].lat,pts[i].lon);
+    if (d<=0) continue;
+    const b = bearingDeg(pts[i-1].lat,pts[i-1].lon,pts[i].lat,pts[i].lon) * Math.PI/180;
+    sx += Math.cos(b)*d; sy += Math.sin(b)*d;
+  }
+  return (Math.atan2(sy,sx)*180/Math.PI + 360) % 360;
+}
+function windRelation(windDirFrom, bearing) {
+  let diff = Math.abs(windDirFrom - bearing) % 360;
+  if (diff > 180) diff = 360 - diff;
+  if (diff < 45)  return { type:'headwind', label:'Pod wiatr',           icon:'💨⬆️', color:'#ff7b72' };
+  if (diff > 135) return { type:'tailwind', label:'Z wiatrem (w plecy)', icon:'💨⬇️', color:'#56d364' };
+  return                 { type:'crosswind', label:'Wiatr boczny',       icon:'💨↔️', color:'#79c0ff' };
+}
+
+let gpxProfiles = {};
+async function getGpxProfile(d) {
+  if (gpxProfiles[d.day]) return gpxProfiles[d.day];
+  if (!d.gpx) return null;
+  try {
+    const res = await fetch(d.gpx);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const re = /<trkpt\s+lat="(-?[\d.]+)"\s+lon="(-?[\d.]+)"[^>]*>\s*<ele>(-?[\d.]+)<\/ele>/g;
+    const pts = [];
+    let m;
+    while ((m = re.exec(text))) pts.push({ lat:parseFloat(m[1]), lon:parseFloat(m[2]), ele:parseFloat(m[3]) });
+    if (pts.length < 2) return null;
+    const win = 11, half = Math.floor(win/2);
+    const smooth = pts.map((p,i) => {
+      let sum=0, cnt=0;
+      for (let j=Math.max(0,i-half); j<=Math.min(pts.length-1,i+half); j++) { sum+=pts[j].ele; cnt++; }
+      return sum/cnt;
+    });
+    const dist=[0], gain=[0];
+    for (let i=1;i<pts.length;i++) {
+      dist.push(dist[i-1] + haversineKm(pts[i-1].lat,pts[i-1].lon,pts[i].lat,pts[i].lon));
+      const diff = smooth[i]-smooth[i-1];
+      gain.push(gain[i-1] + (diff>0?diff:0));
+    }
+    const profile = { dist, ele:smooth, gain, totalKm: dist[dist.length-1], totalGain: gain[gain.length-1], bearing: routeBearing(pts) };
+    gpxProfiles[d.day] = profile;
+    return profile;
+  } catch(e) { console.warn('getGpxProfile:', e.message); return null; }
+}
+
+async function getWindForDay(d, profile, stat) {
+  if (!profile) return null;
+  try {
+    const locIdx = WEATHER_LOCATIONS.findIndex(l => l.date === d.date);
+    if (locIdx === -1) return null;
+    const wx = await wxEnsureData(locIdx);
+    if (!wx || !wx.hourly.wind_direction_10m) return null;
+    const targetIso = wxIsoDate(d.date);
+    const times = wx.hourly.time, dirs = wx.hourly.wind_direction_10m, spds = wx.hourly.wind_speed_10m;
+    let sx=0, sy=0, spdSum=0, n=0;
+    for (let i=0;i<times.length;i++) {
+      if (!times[i].startsWith(targetIso)) continue;
+      const hhmm = times[i].slice(11,16);
+      if (hhmm < stat.actualStart || hhmm > stat.endTime) continue;
+      const rad = (dirs[i]||0) * Math.PI/180, spd = spds[i]||0;
+      sx += Math.cos(rad)*spd; sy += Math.sin(rad)*spd; spdSum += spd; n++;
+    }
+    if (n===0) return null;
+    const avgDirFrom = (Math.atan2(sy,sx)*180/Math.PI + 360) % 360;
+    const avgSpeed = spdSum/n;
+    return { avgSpeed, avgDirFrom, ...windRelation(avgDirFrom, profile.bearing) };
+  } catch(e) { console.warn('getWindForDay:', e.message); return null; }
+}
+
+// ===== DZIŚ NA TRASIE (live tracker) =====
+let todayDayIdx = null;
+
+function defaultCyclingIdx() {
+  const cyclingDays = DAYS.filter(d=>d.km);
+  const now = new Date();
+  for (let i=0;i<cyclingDays.length;i++) {
+    const iso = wxIsoDate(cyclingDays[i].date);
+    if (new Date(iso+'T12:00:00').toDateString() === now.toDateString()) return i;
+  }
+  for (let i=0;i<cyclingDays.length;i++) {
+    const iso = wxIsoDate(cyclingDays[i].date);
+    if (new Date(iso) >= new Date(now.toDateString())) return i;
+  }
+  return 0;
+}
+function selectTodayDay(i) { todayDayIdx = parseInt(i,10); renderToday(); }
+function paceColor(v) { return v<12?'#56d364': v<14?'#79c0ff': v<16?'#ffa657':'#ff7b72'; }
+
+async function setRiddenKm(day, maxKm, value) {
+  const v = Math.max(0, Math.min(maxKm, parseFloat(value)||0));
+  await saveField(`day.${day}.riddenKm`, String(v));
+  await saveField(`day.${day}.riddenAt`, new Date().toISOString());
+  renderToday();
+}
+
+function buildElevationSvg(profile, frac) {
+  const w=640, h=170, padL=42, padR=10, padT=10, padB=24;
+  const innerW=w-padL-padR, innerH=h-padT-padB;
+  const minE=Math.min(...profile.ele), maxE=Math.max(...profile.ele);
+  const spanE=(maxE-minE)||1;
+  const n=profile.dist.length, totalKm=profile.totalKm||1;
+  const x = km => padL + (km/totalKm)*innerW;
+  const y = ele => padT + innerH - ((ele-minE)/spanE)*innerH;
+  let path='';
+  const step = Math.max(1, Math.floor(n/300));
+  for (let i=0;i<n;i+=step) path += (path===''?'M':'L') + x(profile.dist[i]) + ',' + y(profile.ele[i]) + ' ';
+  path += `L${x(profile.dist[n-1])},${y(profile.ele[n-1])}`;
+  const area = path + ` L${x(totalKm)},${padT+innerH} L${x(0)},${padT+innerH} Z`;
+  const markerKm = Math.max(0,Math.min(1,frac))*totalKm;
+  const markerIdx = Math.max(0,Math.min(n-1, Math.round(frac*(n-1))));
+  const markerX = x(markerKm), markerY = y(profile.ele[markerIdx]);
+  let grid='';
+  const gStep = spanE>400?100:50;
+  for (let v=Math.ceil(minE/gStep)*gStep; v<=maxE; v+=gStep) grid += `<line x1="${padL}" y1="${y(v)}" x2="${w-padR}" y2="${y(v)}" stroke="rgba(255,255,255,0.06)"/><text x="${padL-6}" y="${y(v)+3}" text-anchor="end" font-size="9" fill="#8b949e">${v}</text>`;
+  let axis='';
+  const kmStep = totalKm>50?10:5;
+  for (let k=0;k<=totalKm;k+=kmStep) axis += `<text x="${x(k)}" y="${h-6}" text-anchor="middle" font-size="9" fill="#8b949e">${k}km</text>`;
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" style="display:block;min-width:480px;">
+    ${grid}
+    <path d="${area}" fill="#58a6ff" opacity="0.15"/>
+    <path d="${path}" fill="none" stroke="#58a6ff" stroke-width="2"/>
+    <line x1="${markerX}" y1="${padT}" x2="${markerX}" y2="${padT+innerH}" stroke="#ff7b72" stroke-width="2" stroke-dasharray="4,3"/>
+    <circle cx="${markerX}" cy="${markerY}" r="5" fill="#ff7b72" stroke="#0d1117" stroke-width="1.5"/>
+    ${axis}
+  </svg>`;
+}
+
+async function renderToday() {
+  const c = document.getElementById('ttoday');
+  const cyclingDays = DAYS.filter(d=>d.km);
+  if (todayDayIdx === null) todayDayIdx = defaultCyclingIdx();
+  const d = cyclingDays[todayDayIdx];
+  c.innerHTML = `<div class="sh">🎯 Dziś na trasie</div><div style="text-align:center;color:#8b949e;padding:50px 20px;">Ładowanie profilu trasy…</div>`;
+  const profile = await getGpxProfile(d);
+  const s = computeDayStats(d);
+  const wind = await getWindForDay(d, profile, s);
+  renderTodayUI(d, cyclingDays, profile, s, wind);
+}
+
+function renderTodayUI(d, cyclingDays, profile, s, wind) {
+  const c = document.getElementById('ttoday');
+  const riddenKey = `day.${d.day}.riddenKm`;
+  const riddenAtKey = `day.${d.day}.riddenAt`;
+  const riddenKm = Math.min(d.km, Math.max(0, parseFloat(ov(riddenKey,'0'))||0));
+  const riddenAt = ov(riddenAtKey, null);
+  const remainingKm = Math.max(0, d.km - riddenKm);
+  const frac = d.km ? riddenKm/d.km : 0;
+
+  const nowStr = new Date().toTimeString().slice(0,5);
+  const elapsedSinceStart = timeDiffHours(nowStr, s.actualStart);
+  const remainingH = Math.max(0.05, timeDiffHours(s.endTime, nowStr));
+  const requiredPace = remainingKm / remainingH;
+  const paceSoFar = elapsedSinceStart > 0.05 ? riddenKm/elapsedSinceStart : null;
+
+  const idx = profile ? Math.max(0,Math.min(profile.dist.length-1, Math.round(frac*(profile.dist.length-1)))) : 0;
+  const gainRemaining = profile ? Math.round(profile.totalGain - profile.gain[idx]) : null;
+
+  const chartSvg = profile ? buildElevationSvg(profile, frac) : '<p style="color:#8b949e;padding:20px;">Nie udało się wczytać profilu trasy (offline i brak w cache?).</p>';
+
+  c.innerHTML = `
+    <div class="sh">🎯 Dziś na trasie</div>
+    <select onchange="selectTodayDay(this.value)" style="background:#21262d;border:1px solid #30363d;border-radius:8px;padding:8px 12px;color:#e6edf3;font-size:13px;width:100%;margin-bottom:14px;">
+      ${cyclingDays.map((x,i)=>`<option value="${i}" ${x.day===d.day?'selected':''}>${x.date} · ${esc(x.title)}</option>`).join('')}
+    </select>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:13px;color:#8b949e;">Przejechane km:</label>
+        <input type="number" min="0" max="${d.km}" step="0.5" value="${riddenKm}" onchange="setRiddenKm(${d.day}, ${d.km}, this.value)" style="width:90px;">
+        <span style="font-size:12px;color:#8b949e;">/ ${d.km} km</span>
+        ${riddenAt ? `<span style="font-size:11px;color:#8b949e;margin-left:auto;">Zaktualizowano: ${new Date(riddenAt).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}</span>` : ''}
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px;">
+      <div class="stat-box"><div class="sv">${remainingKm.toFixed(1)}</div><div class="sl">km zostało</div></div>
+      <div class="stat-box"><div class="sv">${gainRemaining!=null ? gainRemaining : '–'}</div><div class="sl">m podjazdu zostało</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;">
+      <div class="stat-box"><div class="sv" style="color:${isFinite(requiredPace)?paceColor(requiredPace):'#8b949e'};">${isFinite(requiredPace)&&remainingKm>0 ? requiredPace.toFixed(1) : '–'}</div><div class="sl">km/h wymagane do mety</div></div>
+      <div class="stat-box"><div class="sv">${paceSoFar!=null ? paceSoFar.toFixed(1) : '–'}</div><div class="sl">km/h dotychczas</div></div>
+    </div>
+
+    ${wind ? `<div class="card" style="padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:20px;">${wind.icon}</span>
+      <div><strong style="color:${wind.color};">${Math.round(wind.avgSpeed)} km/h · ${wind.label}</strong><div style="font-size:11px;color:#8b949e;">względem uśrednionego kierunku trasy z GPX</div></div>
+    </div>` : ''}
+
+    <div class="card" style="padding:14px;overflow-x:auto;margin-bottom:12px;">
+      ${chartSvg}
+    </div>
+    <div style="font-size:12px;color:#8b949e;line-height:1.5;">
+      Meta o <strong>${s.endTime}</strong> (${esc(s.constraint)}). Wpisz przejechane km po drodze — appka policzy resztę i pokaże pozycję na profilu wysokości. Dane zsynchronizowane między wszystkimi.
+    </div>
+  `;
+}
+
 // ===== NOCLEGI =====
 function renderNoclegi() {
   const nights = [];
@@ -1185,18 +1406,172 @@ function scoreBar(n, color, width = 90) {
   </div>`;
 }
 
+// ===== WYDATKI (shared expense ledger + settlement) =====
+let expenses = [];
+let expPaidBy = null;
+let expParticipants = { dan:true, kuba:true, maciek:true };
+let expCurrency = 'GBP';
+
+async function loadExpenses() {
+  expenses = cacheGet(CK.expenses, []);
+  try {
+    const {data,error} = await db.from('expenses').select('*').order('created_at', {ascending:false});
+    if (error) throw error;
+    expenses = data||[];
+    cacheSet(CK.expenses, expenses);
+    return true;
+  } catch(e){ console.warn('loadExpenses (cache):', e.message); return false; }
+}
+async function addExpense() {
+  if (!expPaidBy) expPaidBy = me || 'dan';
+  const descEl = document.getElementById('expDesc');
+  const amtEl = document.getElementById('expAmount');
+  const desc = descEl.value.trim();
+  const amount = parseFloat(amtEl.value);
+  if (!desc) { alert('Podaj opis wydatku'); return; }
+  if (!amount || amount <= 0) { alert('Podaj poprawną kwotę'); return; }
+  const participants = PS.filter(p => expParticipants[p]);
+  if (participants.length === 0) { alert('Wybierz przynajmniej jednego uczestnika'); return; }
+  const item = { id:uuid(), description:desc, amount, currency:expCurrency, paid_by:expPaidBy, participants, created_at:new Date().toISOString() };
+  expenses.unshift(item); cacheSet(CK.expenses, expenses);
+  descEl.value=''; amtEl.value='';
+  renderExpensesTab();
+  try { const r = await db.from('expenses').insert(item); if (r.error) throw r.error; }
+  catch(e){ queueWrite({table:'expenses', op:'insert', data:item}); }
+}
+async function delExpense(id) {
+  expenses = expenses.filter(e=>e.id!==id); cacheSet(CK.expenses, expenses); renderExpensesTab();
+  try { const r = await db.from('expenses').delete().eq('id', id); if (r.error) throw r.error; }
+  catch(e){ queueWrite({table:'expenses', op:'delete', id}); }
+}
+
+function setExpPaidBy(p) {
+  expPaidBy = p;
+  const row = document.getElementById('paidByRow');
+  if (row) row.innerHTML = PS.map(x=>`<div class="av ${expPaidBy===x?'on':''}" style="${expPaidBy===x?`--ac:${PC[x]};--abg:${PBG[x]};`:''}" onclick="setExpPaidBy('${x}')" title="${PL[x]}">${PL[x][0]}</div>`).join('');
+}
+function toggleExpParticipant(p) {
+  expParticipants[p] = !expParticipants[p];
+  const row = document.getElementById('participantsRow');
+  if (row) row.innerHTML = PS.map(x=>`<div class="av ${expParticipants[x]?'on':''}" style="${expParticipants[x]?`--ac:${PC[x]};--abg:${PBG[x]};`:''}" onclick="toggleExpParticipant('${x}')" title="${PL[x]}">${expParticipants[x]?'✓':PL[x][0]}</div>`).join('');
+}
+function setExpCurrency(cur) {
+  expCurrency = cur;
+  const gbp = document.getElementById('curGBP'), pln = document.getElementById('curPLN');
+  if (gbp) gbp.className = 'btn btn-sm' + (cur==='GBP'?' btn-g':'');
+  if (pln) pln.className = 'btn btn-sm' + (cur==='PLN'?' btn-g':'');
+}
+
+function computeSettlement(balances) {
+  const creditors=[], debtors=[];
+  Object.entries(balances).forEach(([p,v])=>{ if (v>0.01) creditors.push([p,v]); else if (v<-0.01) debtors.push([p,-v]); });
+  creditors.sort((a,b)=>b[1]-a[1]); debtors.sort((a,b)=>b[1]-a[1]);
+  const txns = [];
+  let i=0, j=0;
+  while (i<debtors.length && j<creditors.length) {
+    const amt = Math.min(debtors[i][1], creditors[j][1]);
+    txns.push({ from:debtors[i][0], to:creditors[j][0], amount:amt });
+    debtors[i][1] -= amt; creditors[j][1] -= amt;
+    if (debtors[i][1] < 0.01) i++;
+    if (creditors[j][1] < 0.01) j++;
+  }
+  return txns;
+}
+
+function renderExpensesTab() {
+  const c = document.getElementById('texp');
+  if (!expPaidBy) expPaidBy = me || 'dan';
+
+  const currencies = [...new Set(expenses.map(e=>e.currency))];
+  const summaryHtml = currencies.map(cur => {
+    const list = expenses.filter(e=>e.currency===cur);
+    const total = list.reduce((s,e)=>s+e.amount, 0);
+    const balances = { dan:0, kuba:0, maciek:0 };
+    list.forEach(e => {
+      const share = e.amount / e.participants.length;
+      e.participants.forEach(p => { balances[p] -= share; });
+      balances[e.paid_by] += e.amount;
+    });
+    const txns = computeSettlement(balances);
+    return `<div class="card" style="padding:16px;margin-bottom:12px;">
+      <div style="font-weight:700;font-size:15px;margin-bottom:10px;">${cur==='GBP'?'💷':'💰'} ${cur} — razem ${total.toFixed(2)}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        ${PS.map(p=>`<div style="text-align:center;padding:8px;background:#0d1117;border-radius:8px;">
+          <div style="font-size:11px;color:${PC[p]};font-weight:700;">${PL[p]}</div>
+          <div style="font-size:15px;font-weight:800;margin-top:2px;color:${balances[p]>0.01?'#56d364':balances[p]<-0.01?'#ff7b72':'#8b949e'};">${balances[p]>=0?'+':''}${balances[p].toFixed(2)}</div>
+        </div>`).join('')}
+      </div>
+      ${txns.length ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #21262d;">
+        ${txns.map(t=>`<div style="font-size:13px;padding:4px 0;">🔁 <strong style="color:${PC[t.from]};">${PL[t.from]}</strong> → <strong style="color:${PC[t.to]};">${PL[t.to]}</strong>: <strong>${t.amount.toFixed(2)} ${cur}</strong></div>`).join('')}
+      </div>` : '<div style="margin-top:10px;font-size:12px;color:#56d364;">✓ Wszystko rozliczone</div>'}
+    </div>`;
+  }).join('');
+
+  c.innerHTML = `
+    <div class="sh">💸 Wydatki</div>
+    <p style="color:#8b949e;font-size:13px;margin-bottom:14px;">Wspólny rejestr wydatków w trasie. Wybierz kto zapłacił i kto korzystał — appka rozliczy kto komu winien.</p>
+
+    ${summaryHtml}
+
+    <div class="card" style="padding:16px;margin:16px 0;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:12px;">+ Dodaj wydatek</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <input type="text" id="expDesc" placeholder="Opis (np. kolacja w Ratagan)">
+        <div style="display:flex;gap:8px;">
+          <input type="number" id="expAmount" placeholder="Kwota" min="0" step="0.01" style="flex:1;">
+          <div style="display:flex;gap:4px;">
+            <button class="btn btn-sm ${expCurrency==='GBP'?'btn-g':''}" id="curGBP" onclick="setExpCurrency('GBP')">GBP</button>
+            <button class="btn btn-sm ${expCurrency==='PLN'?'btn-g':''}" id="curPLN" onclick="setExpCurrency('PLN')">PLN</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">Zapłacił:</div>
+          <div style="display:flex;gap:8px;" id="paidByRow">
+            ${PS.map(p=>`<div class="av ${expPaidBy===p?'on':''}" style="${expPaidBy===p?`--ac:${PC[p]};--abg:${PBG[p]};`:''}" onclick="setExpPaidBy('${p}')" title="${PL[p]}">${PL[p][0]}</div>`).join('')}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:#8b949e;margin-bottom:6px;">Uczestnicy (kto korzystał):</div>
+          <div style="display:flex;gap:8px;" id="participantsRow">
+            ${PS.map(p=>`<div class="av ${expParticipants[p]?'on':''}" style="${expParticipants[p]?`--ac:${PC[p]};--abg:${PBG[p]};`:''}" onclick="toggleExpParticipant('${p}')" title="${PL[p]}">${expParticipants[p]?'✓':PL[p][0]}</div>`).join('')}
+          </div>
+        </div>
+        <button class="btn btn-g" onclick="addExpense()">+ Dodaj wydatek</button>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      ${expenses.length===0 ? '<div style="text-align:center;color:#8b949e;padding:30px 20px;">Brak wydatków. Dodaj pierwszy!</div>' : expenses.map(e=>`
+        <div style="background:#161b22;border:1px solid #30363d;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;">${esc(e.description)}</div>
+            <div style="font-size:11px;color:#8b949e;margin-top:2px;">
+              zapłacił <strong style="color:${PC[e.paid_by]};">${PL[e.paid_by]}</strong> ·
+              dla: ${e.participants.map(p=>PL[p]).join(', ')} ·
+              ${new Date(e.created_at).toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})}
+            </div>
+          </div>
+          <div style="font-weight:700;font-size:15px;white-space:nowrap;">${e.amount.toFixed(2)} ${e.currency}</div>
+          <button onclick="delExpense('${e.id}')" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:18px;padding:0 2px;line-height:1;">×</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 // ===== INIT =====
-let snap = { content:'', tasks:'', pkgs:'', sights:'' };
+let snap = { content:'', tasks:'', pkgs:'', sights:'', expenses:'' };
 function snapOf(v) { try { return JSON.stringify(v); } catch { return ''; } }
 
 async function refreshAll() {
-  await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights()]);
-  const nc = snapOf(content), nt = snapOf(tasks), np = snapOf(pkgs), ns = snapOf(sights);
+  await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights(), loadExpenses()]);
+  const nc = snapOf(content), nt = snapOf(tasks), np = snapOf(pkgs), ns = snapOf(sights), ne = snapOf(expenses);
   if (nc !== snap.content || ns !== snap.sights) renderPlan();
   if (nt !== snap.tasks) renderTasks();
   if (np !== snap.pkgs) renderPack();
   if (ns !== snap.sights) renderSights();
-  snap = { content:nc, tasks:nt, pkgs:np, sights:ns };
+  if (ne !== snap.expenses) renderExpensesTab();
+  snap = { content:nc, tasks:nt, pkgs:np, sights:ns, expenses:ne };
   if (document.getElementById('tst').style.display !== 'none') renderStart();
 }
 
@@ -1205,7 +1580,7 @@ async function init() {
   if (!me) { document.getElementById('umodal').style.display='flex'; }
   else { document.getElementById('umodal').style.display='none'; updBadge(); }
 
-  const [cOk, tOk, pOk, sOk] = await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights()]);
+  const [cOk, tOk, pOk, sOk] = await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights(), loadExpenses()]);
   renderPlan();
   if (tOk && tasks.length===0) await seedTasks();
   renderTasks();
@@ -1213,8 +1588,9 @@ async function init() {
   renderPack();
   if (sOk && sights.length===0) await seedSights();
   renderSights();
+  renderExpensesTab();
   renderStart();
-  snap = { content:snapOf(content), tasks:snapOf(tasks), pkgs:snapOf(pkgs), sights:snapOf(sights) };
+  snap = { content:snapOf(content), tasks:snapOf(tasks), pkgs:snapOf(pkgs), sights:snapOf(sights), expenses:snapOf(expenses) };
 
   await flushPending();
 
@@ -1245,7 +1621,7 @@ function updBadge() {
 
 // ===== TABS =====
 function goTab(name) {
-  const map={start:'tst',plan:'tp',stats:'tstat',sights:'ts',weather:'twx',flights:'tf',train:'tt',noclegi:'tnoc',budget:'tb',tasks:'tts',packing:'tpk'};
+  const map={start:'tst',plan:'tp',today:'ttoday',stats:'tstat',sights:'ts',weather:'twx',flights:'tf',train:'tt',noclegi:'tnoc',budget:'tb',tasks:'tts',packing:'tpk',expenses:'texp'};
   Object.values(map).forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById(map[name]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
@@ -1255,6 +1631,8 @@ function goTab(name) {
   if(name==='stats') renderStats();
   if(name==='noclegi') renderNoclegi();
   if(name==='weather') renderWeather();
+  if(name==='today') renderToday();
+  if(name==='expenses') renderExpensesTab();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -1369,6 +1747,7 @@ function renderStart() {
 
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
       <button class="btn" onclick="goTab('plan')" style="justify-content:center;padding:14px;">📅 Plan</button>
+      <button class="btn" onclick="goTab('today')" style="justify-content:center;padding:14px;">🎯 Dziś</button>
       <button class="btn" onclick="goTab('stats')" style="justify-content:center;padding:14px;">📊 Statystyki</button>
       <button class="btn" onclick="goTab('sights')" style="justify-content:center;padding:14px;">🏰 Zwiedzanie</button>
       <button class="btn" onclick="goTab('weather')" style="justify-content:center;padding:14px;">🌤️ Pogoda</button>
@@ -1376,6 +1755,7 @@ function renderStart() {
       <button class="btn" onclick="goTab('train')" style="justify-content:center;padding:14px;">🚂 Pociągi</button>
       <button class="btn" onclick="goTab('noclegi')" style="justify-content:center;padding:14px;">🏠 Noclegi</button>
       <button class="btn" onclick="goTab('budget')" style="justify-content:center;padding:14px;">💰 Koszty</button>
+      <button class="btn" onclick="goTab('expenses')" style="justify-content:center;padding:14px;">💸 Wydatki</button>
       <button class="btn" onclick="goTab('tasks')" style="justify-content:center;padding:14px;">✅ Zadania</button>
       <button class="btn" onclick="goTab('packing')" style="justify-content:center;padding:14px;">🎒 Pakowanie</button>
     </div>
@@ -1383,8 +1763,16 @@ function renderStart() {
 }
 
 // ===== STATS =====
-function renderStats() {
-  const cycling = DAYS.filter(d => d.km).map((d, i) => ({ d, cycleNum: i+1, s: computeDayStats(d) }));
+async function renderStats() {
+  const c0 = document.getElementById('tstat');
+  c0.innerHTML = `<div class="sh">📊 Statystyki i wysiłek dzienny</div><div style="text-align:center;color:#8b949e;padding:50px 20px;">Ładowanie…</div>`;
+  const cyclingDays = DAYS.filter(d => d.km);
+  const cycling = await Promise.all(cyclingDays.map(async (d, i) => {
+    const s = computeDayStats(d);
+    const profile = await getGpxProfile(d);
+    const wind = profile ? await getWindForDay(d, profile, s) : null;
+    return { d, cycleNum: i+1, s, wind };
+  }));
 
   const totalKm  = cycling.reduce((sum,c) => sum + c.d.km, 0);
   const totalEl  = cycling.reduce((sum,c) => sum + c.d.el, 0);
@@ -1430,6 +1818,8 @@ function renderStats() {
       <strong style="color:#e6edf3;">Effort 0–5</strong> to ocena trudności etapu łącząca dystans i przewyższenia — obliczana z <code>km + m/100</code>.
       <br>
       <strong style="color:#e6edf3;">km/h w ruchu</strong> vs <strong style="color:#e6edf3;">km/h cały czas</strong> — to drugie liczy dystans przez całe okno etapu (łącznie z przerwami), więc łatwiej monitorować tempo w trakcie dnia: sprawdzasz zegarek i wiesz czy nadążasz, bez odliczania przerw.
+      <br>
+      <strong style="color:#e6edf3;">💨 Wiatr</strong> liczony jako uśredniony kierunek/prędkość wiatru (prognoza dla nocnego postoju danego dnia) względem uśrednionego azymutu trasy z GPX — orientacyjny wskaźnik, nie uwzględnia lokalnych zakrętów drogi.
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
@@ -1531,7 +1921,8 @@ function renderStats() {
           </div>
 
           <div style="font-size:12px;color:${c.s.spdCol};font-weight:600;margin-bottom:4px;">⚡ ${c.s.spdLbl}</div>
-          <div style="font-size:12px;color:#8b949e;line-height:1.5;">${esc(c.s.constraint)}</div>
+          <div style="font-size:12px;color:#8b949e;line-height:1.5;margin-bottom:${c.wind?'8px':'0'};">${esc(c.s.constraint)}</div>
+          ${c.wind ? `<span class="badge" style="background:${c.wind.color}22;color:${c.wind.color};border:1px solid ${c.wind.color};">${c.wind.icon} ${Math.round(c.wind.avgSpeed)} km/h · ${c.wind.label}</span>` : ''}
         </div>
       `).join('')}
     </div>

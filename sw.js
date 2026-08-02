@@ -1,4 +1,4 @@
-const CACHE_NAME = 'highlands-v1';
+const CACHE_NAME = 'highlands-v2';
 const STATIC_ASSETS = [
   './',
   'index.html',
