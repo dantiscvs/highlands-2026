@@ -728,20 +728,39 @@ function wxIsoDate(shortDate) {
   return `2026-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
-async function wxEnsureData(idx) {
+const WX_MODELS = [
+  { id:'best_match',           label:'Auto (najlepszy dostępny)' },
+  { id:'gfs_seamless',         label:'GFS (jak meteo.pl)' },
+  { id:'ukmo_seamless',        label:'UK Met Office' },
+  { id:'ecmwf_ifs025',         label:'ECMWF' },
+  { id:'icon_seamless',        label:'ICON (DWD)' },
+];
+let wxModel = localStorage.getItem('hlds_wx_model') || 'gfs_seamless';
+let wxOfflineBlocked = false;
+
+function fillNulls(arr) {
+  let last = 0;
+  return arr.map(v => { if (v==null) return last; last = v; return v; });
+}
+
+async function wxEnsureData(idx, force) {
   const loc = WEATHER_LOCATIONS[idx];
-  const cacheKey = 'hlds_wx_' + idx;
+  const cacheKey = 'hlds_wx_' + idx + '_' + wxModel;
   let cached = cacheGet(cacheKey, null);
   const fresh = cached && (Date.now() - cached.fetchedAt < 3*60*60*1000);
-  if (!fresh && navigator.onLine) {
+  wxOfflineBlocked = false;
+  if ((force || !fresh)) {
+    if (!navigator.onLine) { wxOfflineBlocked = true; return cached; }
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=temperature_2m,apparent_temperature,dew_point_2m,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,wind_gusts_10m,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset&timezone=auto&forecast_days=16`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=temperature_2m,apparent_temperature,dew_point_2m,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,wind_gusts_10m,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset&timezone=auto&forecast_days=16&models=${wxModel}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
-      cached = { fetchedAt: Date.now(), hourly: json.hourly, daily: json.daily };
+      const H = json.hourly;
+      ['temperature_2m','apparent_temperature','dew_point_2m','precipitation','relative_humidity_2m','pressure_msl','wind_speed_10m','wind_gusts_10m','cloud_cover_low','cloud_cover_mid','cloud_cover_high','visibility'].forEach(k => { if (H[k]) H[k] = fillNulls(H[k]); });
+      cached = { fetchedAt: Date.now(), hourly: H, daily: json.daily };
       cacheSet(cacheKey, cached);
-    } catch(e) { console.warn('wxEnsureData:', e.message); }
+    } catch(e) { console.warn('wxEnsureData:', e.message); if (!cached) return null; }
   }
   return cached;
 }
@@ -773,11 +792,19 @@ function wxIcon(precip, cloud, isNight) {
 }
 
 function selectWxLoc(idx) { wxLocIdx = parseInt(idx,10); wxWindowStart = null; renderWeather(); }
+function selectWxModel(model) { wxModel = model; localStorage.setItem('hlds_wx_model', model); wxWindowStart = null; renderWeather(); }
 function wxShift(deltaHours) {
   if (!wxData) return;
   const len = wxData.hourly.time.length;
   wxWindowStart = Math.max(0, Math.min(len - 48, wxWindowStart + deltaHours));
   renderWeatherUI(wxData, WEATHER_LOCATIONS[wxLocIdx]);
+}
+async function wxRefresh() {
+  const btn = document.getElementById('wxRefreshBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Odświeżanie…'; }
+  const data = await wxEnsureData(wxLocIdx, true);
+  if (data) { wxData = data; renderWeatherUI(data, WEATHER_LOCATIONS[wxLocIdx]); }
+  else if (btn) { btn.disabled = false; btn.textContent = '🔄 Odśwież'; }
 }
 
 let wxData = null;
@@ -786,7 +813,7 @@ async function renderWeather() {
   c.innerHTML = `<div class="sh">🌤️ Pogoda</div><div style="text-align:center;color:#8b949e;padding:50px 20px;">Ładowanie prognozy…</div>`;
   const data = await wxEnsureData(wxLocIdx);
   if (!data) {
-    c.innerHTML = `<div class="sh">🌤️ Pogoda</div><div style="text-align:center;color:#8b949e;padding:50px 20px;">Brak danych — appka wymaga internetu przy pierwszym pobraniu prognozy dla tej lokalizacji.</div>`;
+    c.innerHTML = `<div class="sh">🌤️ Pogoda</div><div style="text-align:center;color:#8b949e;padding:50px 20px;">Brak danych — appka wymaga internetu przy pierwszym pobraniu prognozy dla tej lokalizacji i tego modelu.</div>`;
     return;
   }
   wxData = data;
@@ -803,18 +830,19 @@ function renderWeatherUI(data, loc) {
   const times = H.time.slice(start, start+hours);
   if (times.length === 0) { c.innerHTML = `<div class="sh">🌤️ Pogoda</div><p style="color:#8b949e;">Brak danych w tym zakresie.</p>`; return; }
 
-  const temp = H.temperature_2m.slice(start, start+hours);
-  const app  = H.apparent_temperature.slice(start, start+hours);
-  const dew  = H.dew_point_2m.slice(start, start+hours);
-  const precip = H.precipitation.slice(start, start+hours);
-  const hum  = H.relative_humidity_2m.slice(start, start+hours);
-  const pres = H.pressure_msl.slice(start, start+hours);
-  const wind = H.wind_speed_10m.slice(start, start+hours);
-  const gust = H.wind_gusts_10m.slice(start, start+hours);
-  const cLow = H.cloud_cover_low.slice(start, start+hours);
-  const cMid = H.cloud_cover_mid.slice(start, start+hours);
-  const cHi  = H.cloud_cover_high.slice(start, start+hours);
-  const vis  = H.visibility.slice(start, start+hours);
+  const safeSlice = (arr, fallback) => (Array.isArray(arr) ? arr : Array(H.time.length).fill(fallback)).slice(start, start+hours);
+  const temp = safeSlice(H.temperature_2m, 10);
+  const app  = safeSlice(H.apparent_temperature, 10);
+  const dew  = safeSlice(H.dew_point_2m, 8);
+  const precip = safeSlice(H.precipitation, 0);
+  const hum  = safeSlice(H.relative_humidity_2m, 70);
+  const pres = safeSlice(H.pressure_msl, 1013);
+  const wind = safeSlice(H.wind_speed_10m, 0);
+  const gust = safeSlice(H.wind_gusts_10m, 0);
+  const cLow = safeSlice(H.cloud_cover_low, 0);
+  const cMid = safeSlice(H.cloud_cover_mid, 0);
+  const cHi  = safeSlice(H.cloud_cover_high, 0);
+  const vis  = safeSlice(H.visibility, 10000);
 
   const now = new Date();
   const nowIso = now.toISOString().slice(0,13);
@@ -967,14 +995,29 @@ function renderWeatherUI(data, loc) {
   const dateForSun = times[dispIdx].slice(0,10);
   const sun = sunMap[dateForSun] || {};
 
+  const fetchedDt = new Date(data.fetchedAt);
+  const fetchedStr = fetchedDt.toLocaleString('pl-PL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  const isStale = Date.now() - data.fetchedAt > 3*60*60*1000;
+
   c.innerHTML = `
     <div class="sh">🌤️ Pogoda — meteogram</div>
-    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">
       <select onchange="selectWxLoc(this.value)" style="background:#21262d;border:1px solid #30363d;border-radius:8px;padding:8px 12px;color:#e6edf3;font-size:13px;flex:1;min-width:180px;">
         ${WEATHER_LOCATIONS.map((l,i)=>`<option value="${i}" ${i===wxLocIdx?'selected':''}>${l.date} · ${esc(l.label)}</option>`).join('')}
       </select>
+      <select onchange="selectWxModel(this.value)" style="background:#21262d;border:1px solid #30363d;border-radius:8px;padding:8px 12px;color:#e6edf3;font-size:13px;min-width:170px;">
+        ${WX_MODELS.map(m=>`<option value="${m.id}" ${m.id===wxModel?'selected':''}>${esc(m.label)}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
       <button class="btn btn-sm" onclick="wxShift(-24)">← poprzedni dzień</button>
       <button class="btn btn-sm" onclick="wxShift(24)">następny dzień →</button>
+      <button id="wxRefreshBtn" class="btn btn-sm btn-g" onclick="wxRefresh()" style="margin-left:auto;">🔄 Odśwież</button>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;font-size:11px;color:#8b949e;margin-bottom:12px;padding:0 2px;">
+      <div>📅 Pobrano: ${fetchedStr}${isStale ? ' <span style="color:#ffa657;">(nieaktualne, odśwież)</span>' : ''}</div>
+      ${!navigator.onLine ? '<span class="badge br">📡 offline — dane z ostatniego pobrania</span>' : (wxOfflineBlocked ? '<span class="badge bo">📡 offline przy odświeżaniu — pokazano cache</span>' : '')}
     </div>
 
     <div class="card" style="padding:16px;margin-bottom:16px;">
@@ -998,7 +1041,7 @@ function renderWeatherUI(data, loc) {
     </div>
     <div style="font-size:11px;color:#8b949e;margin-top:10px;line-height:1.6;">
       🔴 Temp. powietrza · 🔵 Temp. odczuwalna · 🟣 Punkt rosy (kropkowana) · 🟢 Opad mm/h · 🟠 Wilgotność % · 🔵 Ciśnienie hPa · 🔵 Wiatr km/h (kropkowana = porywy) · ⬛ Zachmurzenie · 🟠 Mgła<br>
-      Prognoza z <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> — wiarygodna do ~7-10 dni naprzód, dalej dane orientacyjne. Odświeżana co 3h.
+      Prognoza z <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (model: ${esc(WX_MODELS.find(m=>m.id===wxModel)?.label || wxModel)}) — wiarygodna do ~7-10 dni naprzód, dalej dane orientacyjne. Cache odświeżany automatycznie co 3h przy dostępnym internecie, działa też offline z ostatnich danych.
     </div>
   `;
 }
