@@ -126,6 +126,7 @@ tr:last-child td { border-bottom: none; }
     <button class="tab" data-tab="plan" onclick="goTab('plan')">📅 Plan</button>
     <button class="tab" data-tab="stats" onclick="goTab('stats')">📊 Statystyki</button>
     <button class="tab" data-tab="sights" onclick="goTab('sights')">🏰 Zwiedzanie</button>
+    <button class="tab" data-tab="weather" onclick="goTab('weather')">🌤️ Pogoda</button>
     <button class="tab" data-tab="flights" onclick="goTab('flights')">✈️ Loty</button>
     <button class="tab" data-tab="train" onclick="goTab('train')">🚂 Pociągi</button>
     <button class="tab" data-tab="noclegi" onclick="goTab('noclegi')">🏠 Noclegi</button>
@@ -164,6 +165,8 @@ tr:last-child td { border-bottom: none; }
   </div>
   <div id="sightsList" style="display:flex;flex-direction:column;gap:10px;"></div>
 </div>
+
+<div id="twx" style="display:none;"></div>
 
 <div id="tf" style="display:none;">
   <div class="sh">✈️ Loty</div>
@@ -706,6 +709,300 @@ const DAYS = [
   },
 ];
 
+// ===== POGODA (Open-Meteo, meteo.pl-style meteogram) =====
+const WEATHER_LOCATIONS = [
+  { date:'5.08',  label:'Musselburgh',   lat:55.9440, lon:-3.0540 },
+  { date:'6.08',  label:'Fort Augustus', lat:57.1450, lon:-4.6790 },
+  { date:'7.08',  label:'Ratagan',       lat:57.2170, lon:-5.4390 },
+  { date:'8.08',  label:'Achnasheen',    lat:57.5730, lon:-5.0710 },
+  { date:'9.08',  label:'Dundonnell',    lat:57.7690, lon:-5.1330 },
+  { date:'10.08', label:'Bonar Bridge',  lat:57.8890, lon:-4.3600 },
+  { date:'11.08', label:'Inverness',     lat:57.4778, lon:-4.2247 },
+  { date:'12.08', label:'Edynburg',      lat:55.9533, lon:-3.1883 },
+];
+let wxLocIdx = 0;
+let wxWindowStart = null;
+
+function wxIsoDate(shortDate) {
+  const [d,m] = shortDate.split('.').map(Number);
+  return `2026-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+
+async function wxEnsureData(idx) {
+  const loc = WEATHER_LOCATIONS[idx];
+  const cacheKey = 'hlds_wx_' + idx;
+  let cached = cacheGet(cacheKey, null);
+  const fresh = cached && (Date.now() - cached.fetchedAt < 3*60*60*1000);
+  if (!fresh && navigator.onLine) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&hourly=temperature_2m,apparent_temperature,dew_point_2m,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,wind_gusts_10m,cloud_cover_low,cloud_cover_mid,cloud_cover_high,visibility&daily=sunrise,sunset&timezone=auto&forecast_days=16`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      cached = { fetchedAt: Date.now(), hourly: json.hourly, daily: json.daily };
+      cacheSet(cacheKey, cached);
+    } catch(e) { console.warn('wxEnsureData:', e.message); }
+  }
+  return cached;
+}
+
+function wxFindWindowStart(times, targetIso) {
+  let idx = times.findIndex(t => t.startsWith(targetIso));
+  if (idx === -1) {
+    idx = targetIso < times[0].slice(0,10) ? 0 : Math.max(0, times.length - 48);
+  } else {
+    idx = Math.max(0, idx - 6); // small lead-in before midnight of target day
+  }
+  return idx;
+}
+
+function wxNiceStep(range) {
+  const cands = [1,2,5,10,20,50,100];
+  for (const c of cands) if (range / c <= 6) return c;
+  return 100;
+}
+function wxScale(min, max, top, height) {
+  const span = (max - min) || 1;
+  return v => top + height - ((v - min) / span) * height;
+}
+function wxIcon(precip, cloud, isNight) {
+  if (precip > 0.3) return '🌧️';
+  if (cloud > 75)   return isNight ? '☁️' : '☁️';
+  if (cloud > 35)   return isNight ? '🌙' : '⛅';
+  return isNight ? '🌙' : '☀️';
+}
+
+function selectWxLoc(idx) { wxLocIdx = parseInt(idx,10); wxWindowStart = null; renderWeather(); }
+function wxShift(deltaHours) {
+  if (!wxData) return;
+  const len = wxData.hourly.time.length;
+  wxWindowStart = Math.max(0, Math.min(len - 48, wxWindowStart + deltaHours));
+  renderWeatherUI(wxData, WEATHER_LOCATIONS[wxLocIdx]);
+}
+
+let wxData = null;
+async function renderWeather() {
+  const c = document.getElementById('twx');
+  c.innerHTML = `<div class="sh">🌤️ Pogoda</div><div style="text-align:center;color:#8b949e;padding:50px 20px;">Ładowanie prognozy…</div>`;
+  const data = await wxEnsureData(wxLocIdx);
+  if (!data) {
+    c.innerHTML = `<div class="sh">🌤️ Pogoda</div><div style="text-align:center;color:#8b949e;padding:50px 20px;">Brak danych — appka wymaga internetu przy pierwszym pobraniu prognozy dla tej lokalizacji.</div>`;
+    return;
+  }
+  wxData = data;
+  const loc = WEATHER_LOCATIONS[wxLocIdx];
+  if (wxWindowStart === null) wxWindowStart = wxFindWindowStart(data.hourly.time, wxIsoDate(loc.date));
+  renderWeatherUI(data, loc);
+}
+
+function renderWeatherUI(data, loc) {
+  const c = document.getElementById('twx');
+  const hours = 48;
+  const start = wxWindowStart;
+  const H = data.hourly;
+  const times = H.time.slice(start, start+hours);
+  if (times.length === 0) { c.innerHTML = `<div class="sh">🌤️ Pogoda</div><p style="color:#8b949e;">Brak danych w tym zakresie.</p>`; return; }
+
+  const temp = H.temperature_2m.slice(start, start+hours);
+  const app  = H.apparent_temperature.slice(start, start+hours);
+  const dew  = H.dew_point_2m.slice(start, start+hours);
+  const precip = H.precipitation.slice(start, start+hours);
+  const hum  = H.relative_humidity_2m.slice(start, start+hours);
+  const pres = H.pressure_msl.slice(start, start+hours);
+  const wind = H.wind_speed_10m.slice(start, start+hours);
+  const gust = H.wind_gusts_10m.slice(start, start+hours);
+  const cLow = H.cloud_cover_low.slice(start, start+hours);
+  const cMid = H.cloud_cover_mid.slice(start, start+hours);
+  const cHi  = H.cloud_cover_high.slice(start, start+hours);
+  const vis  = H.visibility.slice(start, start+hours);
+
+  const now = new Date();
+  const nowIso = now.toISOString().slice(0,13);
+  const curIdx = times.findIndex(t => t.slice(0,13) === nowIso);
+  const dispIdx = curIdx >= 0 ? curIdx : 0;
+  const curCloud = (cLow[dispIdx]||0)*0.34 + (cMid[dispIdx]||0)*0.33 + (cHi[dispIdx]||0)*0.33;
+
+  // sunrise/sunset lookup per date
+  const sunMap = {};
+  (data.daily.time||[]).forEach((d,i) => { sunMap[d] = { rise: data.daily.sunrise[i], set: data.daily.sunset[i] }; });
+  function isNightAt(iso) {
+    const date = iso.slice(0,10);
+    const s = sunMap[date];
+    if (!s) return false;
+    return iso < s.rise || iso > s.set;
+  }
+
+  // Layout
+  const colW = 32, leftPad = 46, rightPad = 14;
+  const width = leftPad + rightPad + hours*colW;
+  const dayHdrH = 26, gap = 10;
+  const hTemp = 150, hPrecip = 110, hPres = 80, hWind = 80, hCloud = 100, axisH = 22;
+  const yDayHdr = 0;
+  const yTemp   = yDayHdr + dayHdrH;
+  const yPrecip = yTemp + hTemp + gap;
+  const yPres   = yPrecip + hPrecip + gap;
+  const yWind   = yPres + hPres + gap;
+  const yCloud  = yWind + hWind + gap;
+  const yAxis   = yCloud + hCloud;
+  const totalH  = yAxis + axisH;
+
+  const x = i => leftPad + i*colW + colW/2;
+  const barW = colW - 6;
+
+  // night bands
+  let nightRects = '';
+  for (let i=0;i<hours;i++) { if (isNightAt(times[i])) nightRects += `<rect x="${leftPad+i*colW}" y="0" width="${colW}" height="${totalH-axisH}" fill="rgba(88,166,255,0.05)"/>`; }
+
+  // day headers (group by date)
+  let dayHeaders = '';
+  { let i=0; while (i<hours) { const date=times[i].slice(0,10); let j=i; while (j<hours && times[j].slice(0,10)===date) j++;
+      const cx = leftPad + (i+ (j-i)/2)*colW;
+      const dt = new Date(date+'T12:00:00');
+      const lbl = dt.toLocaleDateString('pl-PL',{weekday:'short',day:'2-digit',month:'2-digit'});
+      dayHeaders += `<text x="${cx}" y="17" text-anchor="middle" font-size="11" font-weight="700" fill="#8b949e">${lbl}</text>`;
+      if (i>0) dayHeaders += `<line x1="${leftPad+i*colW}" y1="0" x2="${leftPad+i*colW}" y2="${totalH-axisH}" stroke="#30363d" stroke-width="1"/>`;
+      i=j; } }
+
+  // ---- Temperature panel ----
+  const tAll = [...temp,...app,...dew].filter(v=>v!=null);
+  const tMin = Math.floor(Math.min(...tAll)-2), tMax = Math.ceil(Math.max(...tAll)+2);
+  const yT = wxScale(tMin, tMax, yTemp, hTemp);
+  const tStep = wxNiceStep(tMax-tMin);
+  let tGrid='', tLabels='';
+  for (let v=Math.ceil(tMin/tStep)*tStep; v<=tMax; v+=tStep) {
+    const yy = yT(v);
+    tGrid += `<line x1="${leftPad}" y1="${yy}" x2="${width-rightPad}" y2="${yy}" stroke="${v===0?'rgba(88,166,255,0.35)':'rgba(255,255,255,0.06)'}" stroke-width="1"/>`;
+    tLabels += `<text x="${leftPad-6}" y="${yy+3}" text-anchor="end" font-size="10" fill="#8b949e">${v}°</text>`;
+  }
+  function pathOf(arr, yf) { return arr.map((v,i)=> (v==null? '' : `${i===0||arr[i-1]==null?'M':'L'}${x(i)},${yf(v)}`)).join(' '); }
+  const tempPath = pathOf(temp, yT);
+  const appPath  = pathOf(app, yT);
+  const dewPath  = pathOf(dew, yT);
+
+  // ---- Precip + humidity panel ----
+  const precipMax = Math.max(2, Math.ceil(Math.max(...precip)*1.3));
+  const yP = wxScale(0, precipMax, yPrecip, hPrecip*0.75);
+  const yH = wxScale(0, 100, yPrecip, hPrecip);
+  let precipBars = '';
+  for (let i=0;i<hours;i++) {
+    const v = precip[i]||0;
+    if (v>0) { const yy=yP(v); precipBars += `<rect x="${x(i)-barW/2}" y="${yy}" width="${barW}" height="${(yPrecip+hPrecip*0.75)-yy}" fill="#56d364" opacity="0.85"/>`; }
+  }
+  const humPath = pathOf(hum, yH);
+  let precipLabels = '';
+  for (let v=0; v<=precipMax; v+=Math.max(1,Math.round(precipMax/4))) precipLabels += `<text x="${leftPad-6}" y="${yP(v)+3}" text-anchor="end" font-size="9" fill="#56d364">${v}</text>`;
+  for (let v=0; v<=100; v+=25) precipLabels += `<text x="${width-rightPad+6}" y="${yH(v)+3}" text-anchor="start" font-size="9" fill="#ffa657">${v}%</text>`;
+
+  // ---- Pressure panel ----
+  const pMin = Math.floor(Math.min(...pres)-2), pMax = Math.ceil(Math.max(...pres)+2);
+  const yPr = wxScale(pMin, pMax, yPres, hPres);
+  const presPath = pathOf(pres, yPr);
+  const presArea = presPath + ` L${x(hours-1)},${yPres+hPres} L${x(0)},${yPres+hPres} Z`;
+  const pStep = wxNiceStep(pMax-pMin);
+  let presLabels='';
+  for (let v=Math.ceil(pMin/pStep)*pStep; v<=pMax; v+=pStep) presLabels += `<text x="${leftPad-6}" y="${yPr(v)+3}" text-anchor="end" font-size="9" fill="#39c5cf">${v}</text>`;
+
+  // ---- Wind panel ----
+  const wMax = Math.max(10, Math.ceil(Math.max(...gust,...wind)*1.15));
+  const yW = wxScale(0, wMax, yWind, hWind);
+  const windPath = pathOf(wind, yW);
+  const windArea = windPath + ` L${x(hours-1)},${yWind+hWind} L${x(0)},${yWind+hWind} Z`;
+  const gustPath = pathOf(gust, yW);
+  let windLabels='';
+  for (let v=0; v<=wMax; v+=wxNiceStep(wMax)) windLabels += `<text x="${leftPad-6}" y="${yW(v)+3}" text-anchor="end" font-size="9" fill="#58a6ff">${v}</text>`;
+
+  // ---- Cloud + fog panel ----
+  const yC = wxScale(0,100,yCloud,hCloud*0.8);
+  let cloudBars='', fogBars='';
+  for (let i=0;i<hours;i++) {
+    const low=cLow[i]||0, mid=cMid[i]||0, hi=cHi[i]||0;
+    const total = Math.min(100, (low*0.4+mid*0.35+hi*0.25));
+    const yy = yC(total);
+    cloudBars += `<rect x="${x(i)-barW/2}" y="${yy}" width="${barW}" height="${(yCloud+hCloud*0.8)-yy}" fill="#6e7681" opacity="0.55"/>`;
+    const v = vis[i];
+    if (v!=null && v<2000) { const fh = (2000-v)/2000 * (hCloud*0.15); fogBars += `<rect x="${x(i)-barW/2}" y="${yCloud+hCloud-fh}" width="${barW}" height="${fh}" fill="#ffa657" opacity="0.85"/>`; }
+  }
+
+  // ---- X axis (hour labels) ----
+  let axisLabels = '';
+  for (let i=0;i<hours;i+=3) axisLabels += `<text x="${x(i)}" y="${yAxis+15}" text-anchor="middle" font-size="9" fill="#8b949e">${times[i].slice(11,16)}</text>`;
+
+  const svg = `<svg viewBox="0 0 ${width} ${totalH}" width="${width}" height="${totalH}" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+    ${nightRects}
+    ${dayHeaders}
+    <g>${tGrid}${tLabels}
+      <path d="${dewPath}" fill="none" stroke="#d2a8ff" stroke-width="1.5" stroke-dasharray="2,3"/>
+      <path d="${appPath}" fill="none" stroke="#58a6ff" stroke-width="2"/>
+      <path d="${tempPath}" fill="none" stroke="#ff7b72" stroke-width="2.5"/>
+      <text x="${leftPad}" y="${yTemp+12}" font-size="10" fill="#ff7b72" font-weight="700">Temperatura °C</text>
+    </g>
+    <g>
+      ${precipBars}
+      <path d="${humPath}" fill="none" stroke="#ffa657" stroke-width="2"/>
+      ${precipLabels}
+      <text x="${leftPad}" y="${yPrecip+12}" font-size="10" fill="#56d364" font-weight="700">Opad mm/h</text>
+      <text x="${width-rightPad}" y="${yPrecip+12}" text-anchor="end" font-size="10" fill="#ffa657" font-weight="700">Wilgotność %</text>
+    </g>
+    <g>
+      <path d="${presArea}" fill="#39c5cf" opacity="0.15"/>
+      <path d="${presPath}" fill="none" stroke="#39c5cf" stroke-width="2"/>
+      ${presLabels}
+      <text x="${leftPad}" y="${yPres+12}" font-size="10" fill="#39c5cf" font-weight="700">Ciśnienie hPa</text>
+    </g>
+    <g>
+      <path d="${windArea}" fill="#58a6ff" opacity="0.18"/>
+      <path d="${windPath}" fill="none" stroke="#58a6ff" stroke-width="2"/>
+      <path d="${gustPath}" fill="none" stroke="#79c0ff" stroke-width="1.5" stroke-dasharray="3,3"/>
+      ${windLabels}
+      <text x="${leftPad}" y="${yWind+12}" font-size="10" fill="#58a6ff" font-weight="700">Wiatr km/h</text>
+    </g>
+    <g>
+      ${cloudBars}${fogBars}
+      <text x="${leftPad}" y="${yCloud+12}" font-size="10" fill="#8b949e" font-weight="700">Zachmurzenie / Mgła</text>
+    </g>
+    ${axisLabels}
+  </svg>`;
+
+  const curTemp = temp[dispIdx]!=null ? Math.round(temp[dispIdx]) : '–';
+  const dateForSun = times[dispIdx].slice(0,10);
+  const sun = sunMap[dateForSun] || {};
+
+  c.innerHTML = `
+    <div class="sh">🌤️ Pogoda — meteogram</div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+      <select onchange="selectWxLoc(this.value)" style="background:#21262d;border:1px solid #30363d;border-radius:8px;padding:8px 12px;color:#e6edf3;font-size:13px;flex:1;min-width:180px;">
+        ${WEATHER_LOCATIONS.map((l,i)=>`<option value="${i}" ${i===wxLocIdx?'selected':''}>${l.date} · ${esc(l.label)}</option>`).join('')}
+      </select>
+      <button class="btn btn-sm" onclick="wxShift(-24)">← poprzedni dzień</button>
+      <button class="btn btn-sm" onclick="wxShift(24)">następny dzień →</button>
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:36px;">${wxIcon(precip[dispIdx]||0, curCloud, isNightAt(times[dispIdx]))}</div>
+          <div>
+            <div style="font-size:24px;font-weight:800;">${curTemp}°C</div>
+            <div style="font-size:13px;color:#8b949e;">${esc(loc.label)}</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#8b949e;text-align:right;">
+          🌅 ${sun.rise ? sun.rise.slice(11,16) : '–'} · 🌇 ${sun.set ? sun.set.slice(11,16) : '–'}<br>
+          ${loc.lat.toFixed(2)}°N, ${loc.lon.toFixed(2)}°W
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:14px;overflow-x:auto;">
+      ${svg}
+    </div>
+    <div style="font-size:11px;color:#8b949e;margin-top:10px;line-height:1.6;">
+      🔴 Temp. powietrza · 🔵 Temp. odczuwalna · 🟣 Punkt rosy (kropkowana) · 🟢 Opad mm/h · 🟠 Wilgotność % · 🔵 Ciśnienie hPa · 🔵 Wiatr km/h (kropkowana = porywy) · ⬛ Zachmurzenie · 🟠 Mgła<br>
+      Prognoza z <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> — wiarygodna do ~7-10 dni naprzód, dalej dane orientacyjne. Odświeżana co 3h.
+    </div>
+  `;
+}
+
 // ===== NOCLEGI =====
 function renderNoclegi() {
   const nights = [];
@@ -896,7 +1193,7 @@ function updBadge() {
 
 // ===== TABS =====
 function goTab(name) {
-  const map={start:'tst',plan:'tp',stats:'tstat',sights:'ts',flights:'tf',train:'tt',noclegi:'tnoc',budget:'tb',tasks:'tts',packing:'tpk'};
+  const map={start:'tst',plan:'tp',stats:'tstat',sights:'ts',weather:'twx',flights:'tf',train:'tt',noclegi:'tnoc',budget:'tb',tasks:'tts',packing:'tpk'};
   Object.values(map).forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById(map[name]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
@@ -905,6 +1202,7 @@ function goTab(name) {
   if(name==='start') renderStart();
   if(name==='stats') renderStats();
   if(name==='noclegi') renderNoclegi();
+  if(name==='weather') renderWeather();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -1021,6 +1319,7 @@ function renderStart() {
       <button class="btn" onclick="goTab('plan')" style="justify-content:center;padding:14px;">📅 Plan</button>
       <button class="btn" onclick="goTab('stats')" style="justify-content:center;padding:14px;">📊 Statystyki</button>
       <button class="btn" onclick="goTab('sights')" style="justify-content:center;padding:14px;">🏰 Zwiedzanie</button>
+      <button class="btn" onclick="goTab('weather')" style="justify-content:center;padding:14px;">🌤️ Pogoda</button>
       <button class="btn" onclick="goTab('flights')" style="justify-content:center;padding:14px;">✈️ Loty</button>
       <button class="btn" onclick="goTab('train')" style="justify-content:center;padding:14px;">🚂 Pociągi</button>
       <button class="btn" onclick="goTab('noclegi')" style="justify-content:center;padding:14px;">🏠 Noclegi</button>
