@@ -49,8 +49,9 @@ details[open] .chev { transform: rotate(180deg); }
 .ico { width: 22px; flex-shrink: 0; text-align: center; margin-top: 1px; }
 .ilbl { color: #8b949e; min-width: 88px; flex-shrink: 0; font-size: 13px; }
 .sh { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-input[type="text"], textarea { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; color: #e6edf3; font-size: 14px; outline: none; font-family: inherit; }
-input[type="text"]:focus, textarea:focus { border-color: #58a6ff; }
+input[type="text"], input[type="time"], textarea { background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; color: #e6edf3; font-size: 14px; outline: none; font-family: inherit; }
+input[type="text"]:focus, input[type="time"]:focus, textarea:focus { border-color: #58a6ff; }
+input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
 .notebox { background: #2d1f00; border: 1px solid #db6d28; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #ffa657; margin-top: 10px; }
 .tt { font-size: 26px; font-weight: 800; }
 .ts { font-size: 13px; color: #8b949e; }
@@ -1135,25 +1136,33 @@ function effortScore(km, el) {
   return { eff, score, label, color };
 }
 function cyclingIndex(d) { return DAYS.filter(x => x.km).findIndex(x => x.day === d.day); }
+function timeDiffHours(endStr, startStr) {
+  const [eh,em] = endStr.split(':').map(Number);
+  const [sh,sm] = startStr.split(':').map(Number);
+  return (eh*60+em - (sh*60+sm)) / 60;
+}
+
 function computeDayStats(d) {
   if (!d.km) return null;
   const cIdx = cyclingIndex(d);
   const last = DAYS.filter(x => x.km).length - 1;
-  let movingH, totalWindow, elapsedH, startTime, endTime, constraint, movingNote;
+  let defaultStart, endTime, breakH, constraint;
   if (cIdx === 0) {
-    startTime = '9:00'; endTime = '19:00';
-    movingH = 3.75; totalWindow = 10; elapsedH = 4.25;
-    movingNote = 'na rowerze 14:45–19:00';
-    constraint = 'Wyjazd z Musselburgh 9:00. Pociąg 10:33–14:16 → start rowerowy z Inverness ~14:45. Fort Augustus max 19:00 (zamknięcie restauracji). Efektywne okno cyclingowe 4h 15m.';
+    defaultStart = '14:45'; endTime = '19:00'; breakH = 0.5;
+    constraint = 'Wyjazd z Musselburgh 9:00. Pociąg 10:33–14:16 → start rowerowy z Inverness. Fort Augustus max 19:00 (zamknięcie restauracji).';
   } else if (cIdx === last) {
-    startTime = '8:00'; endTime = '17:00';
-    movingH = 7; totalWindow = 9; elapsedH = 9;
+    defaultStart = '8:00'; endTime = '17:00'; breakH = 2;
     constraint = 'Pociąg 18:52 z Inverness → arrival Inverness max 17:00 (spakowanie rowerów, dojazd na stację). Krótsze okno przez późniejszy start.';
   } else {
-    startTime = '8:00'; endTime = '18:00';
-    movingH = 8; totalWindow = 10; elapsedH = 10;
+    defaultStart = '8:00'; endTime = '18:00'; breakH = 2;
     constraint = 'Standard: 8h pedałowania + 2h przerw = 10h dziennie.';
   }
+  const overrideKey = `day.${d.day}.actualStart`;
+  const override = ov(overrideKey, null);
+  const actualStart = override || defaultStart;
+  const isOverridden = !!override;
+  const elapsedH = Math.max(0.25, timeDiffHours(endTime, actualStart));
+  const movingH = Math.max(0.25, elapsedH - breakH);
   const speed = d.km / movingH;
   const avgFull = d.km / elapsedH;
   const score = effortScore(d.km, d.el);
@@ -1167,7 +1176,7 @@ function computeDayStats(d) {
   else if (avgFull < 10) avgFullCol = '#79c0ff';
   else if (avgFull < 12) avgFullCol = '#ffa657';
   else                   avgFullCol = '#ff7b72';
-  return { cyclingIdx: cIdx, movingH, totalWindow, elapsedH, startTime, endTime, constraint, movingNote, speed, avgFull, avgFullCol, score, spdLbl, spdCol };
+  return { cyclingIdx: cIdx, movingH, elapsedH, actualStart, defaultStart, isOverridden, endTime, constraint, speed, avgFull, avgFullCol, score, spdLbl, spdCol };
 }
 function scoreBar(n, color, width = 90) {
   const pct = Math.max(0, Math.min(100, n * 10));
@@ -1510,9 +1519,14 @@ function renderStats() {
           </div>
 
           <div style="background:#0d1117;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-              <div><span style="color:#8b949e;">Start:</span> <strong>${c.s.startTime}</strong> &nbsp;→&nbsp; <span style="color:#8b949e;">Meta:</span> <strong>${c.s.endTime}</strong></div>
-              <div style="color:#8b949e;font-size:12px;">okno ${c.s.totalWindow}h · w ruchu ${c.s.movingH}h${c.s.movingNote ? ` (${c.s.movingNote})` : ''}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span style="color:#8b949e;">Rzeczywisty start:</span>
+                <input type="time" value="${c.s.actualStart}" onchange="setActualStart(${c.d.day}, this.value)" style="width:90px;">
+                ${c.s.isOverridden ? `<button onclick="resetActualStart(${c.d.day})" title="Przywróć domyślną godzinę (${c.s.defaultStart})" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:15px;padding:0 2px;">↺</button>` : ''}
+                <span style="color:#8b949e;">→ Meta:</span> <strong>${c.s.endTime}</strong>
+              </div>
+              <div style="color:#8b949e;font-size:12px;">okno ${c.s.elapsedH.toFixed(2)}h · w ruchu ${c.s.movingH.toFixed(2)}h</div>
             </div>
           </div>
 
@@ -1549,6 +1563,17 @@ async function saveField(key, value) {
   const payload = {id:key,value:value,updated_at:new Date().toISOString()};
   try { const r = await db.from('content').upsert(payload); if(r.error) throw r.error; }
   catch(e){ console.warn('saveField (queued):',e.message); queueWrite({table:'content', op:'upsert', data:payload}); }
+}
+
+async function setActualStart(day, value) {
+  await saveField(`day.${day}.actualStart`, value);
+  renderStats();
+  renderPlan();
+}
+async function resetActualStart(day) {
+  await saveField(`day.${day}.actualStart`, '');
+  renderStats();
+  renderPlan();
 }
 
 function toggleEdit() {
