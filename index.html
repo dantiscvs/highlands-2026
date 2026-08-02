@@ -799,29 +799,35 @@ function computeDayStats(d) {
   if (!d.km) return null;
   const cIdx = cyclingIndex(d);
   const last = DAYS.filter(x => x.km).length - 1;
-  let movingH, totalWindow, startTime, endTime, constraint, movingNote;
+  let movingH, totalWindow, elapsedH, startTime, endTime, constraint, movingNote;
   if (cIdx === 0) {
     startTime = '9:00'; endTime = '19:00';
-    movingH = 3.75; totalWindow = 10;
+    movingH = 3.75; totalWindow = 10; elapsedH = 4.25;
     movingNote = 'na rowerze 14:45–19:00';
     constraint = 'Wyjazd z Musselburgh 9:00. Pociąg 10:33–14:16 → start rowerowy z Inverness ~14:45. Fort Augustus max 19:00 (zamknięcie restauracji). Efektywne okno cyclingowe 4h 15m.';
   } else if (cIdx === last) {
     startTime = '8:00'; endTime = '17:00';
-    movingH = 7; totalWindow = 9;
+    movingH = 7; totalWindow = 9; elapsedH = 9;
     constraint = 'Pociąg 18:52 z Inverness → arrival Inverness max 17:00 (spakowanie rowerów, dojazd na stację). Krótsze okno przez późniejszy start.';
   } else {
     startTime = '8:00'; endTime = '18:00';
-    movingH = 8; totalWindow = 10;
+    movingH = 8; totalWindow = 10; elapsedH = 10;
     constraint = 'Standard: 8h pedałowania + 2h przerw = 10h dziennie.';
   }
   const speed = d.km / movingH;
+  const avgFull = d.km / elapsedH;
   const score = effortScore(d.km, d.el);
   let spdLbl, spdCol;
   if (speed < 12)      { spdLbl = 'Spokojne tempo';       spdCol = '#56d364'; }
   else if (speed < 14) { spdLbl = 'Solidne tempo';        spdCol = '#79c0ff'; }
   else if (speed < 16) { spdLbl = 'Wysokie tempo';        spdCol = '#ffa657'; }
   else                 { spdLbl = 'Trzeba się cisnąć';    spdCol = '#ff7b72'; }
-  return { cyclingIdx: cIdx, movingH, totalWindow, startTime, endTime, constraint, movingNote, speed, score, spdLbl, spdCol };
+  let avgFullCol;
+  if (avgFull < 8)       avgFullCol = '#56d364';
+  else if (avgFull < 10) avgFullCol = '#79c0ff';
+  else if (avgFull < 12) avgFullCol = '#ffa657';
+  else                   avgFullCol = '#ff7b72';
+  return { cyclingIdx: cIdx, movingH, totalWindow, elapsedH, startTime, endTime, constraint, movingNote, speed, avgFull, avgFullCol, score, spdLbl, spdCol };
 }
 function scoreBar(n, color, width = 90) {
   const pct = Math.max(0, Math.min(100, n * 10));
@@ -1033,6 +1039,7 @@ function renderStats() {
   const totalEl  = cycling.reduce((sum,c) => sum + c.d.el, 0);
   const avgScore = cycling.reduce((sum,c) => sum + c.s.score.score, 0) / cycling.length;
   const avgSpeed = cycling.reduce((sum,c) => sum + c.s.speed, 0) / cycling.length;
+  const avgFullAll = cycling.reduce((sum,c) => sum + c.s.avgFull, 0) / cycling.length;
   const maxKm    = Math.max(...cycling.map(c => c.d.km));
   const maxEl    = Math.max(...cycling.map(c => c.d.el));
 
@@ -1056,6 +1063,7 @@ function renderStats() {
   const elBars  = cycling.map(c => ({ day: c.d.date, label: c.d.el,                  value: c.d.el }));
   const effBars = cycling.map(c => ({ day: c.d.date, label: c.s.score.score.toFixed(1),   value: c.s.score.score, color: c.s.score.color }));
   const spdBars = cycling.map(c => ({ day: c.d.date, label: c.s.speed.toFixed(1),     value: c.s.speed,       color: c.s.spdCol }));
+  const avgFullBars = cycling.map(c => ({ day: c.d.date, label: c.s.avgFull.toFixed(1), value: c.s.avgFull,   color: c.s.avgFullCol }));
 
   const kmColor = v => v < 70 ? '#56d364' : v < 95 ? '#79c0ff' : v < 105 ? '#ffa657' : '#ff7b72';
   const elColor = v => v < 700 ? '#56d364' : v < 1000 ? '#79c0ff' : v < 1150 ? '#ffa657' : '#ff7b72';
@@ -1069,13 +1077,18 @@ function renderStats() {
       <strong style="color:#ffa657;">Dzień 6</strong> ograniczony (Inverness max 17:00 — pakowanie rowerów + pociąg 18:52).
       <br>
       <strong style="color:#e6edf3;">Effort 0–5</strong> to ocena trudności etapu łącząca dystans i przewyższenia — obliczana z <code>km + m/100</code>.
+      <br>
+      <strong style="color:#e6edf3;">km/h w ruchu</strong> vs <strong style="color:#e6edf3;">km/h cały czas</strong> — to drugie liczy dystans przez całe okno etapu (łącznie z przerwami), więc łatwiej monitorować tempo w trakcie dnia: sprawdzasz zegarek i wiesz czy nadążasz, bez odliczania przerw.
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:24px;">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;">
       <div class="stat-box"><div class="sv">${totalKm.toFixed(1)}</div><div class="sl">km łącznie</div></div>
       <div class="stat-box"><div class="sv">${totalEl}</div><div class="sl">m przewyższenia</div></div>
       <div class="stat-box"><div class="sv">${avgScore.toFixed(1)}<span style="font-size:14px;color:#8b949e;">/10</span></div><div class="sl">avg effort</div></div>
-      <div class="stat-box"><div class="sv">${avgSpeed.toFixed(1)}</div><div class="sl">km/h średnio</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:24px;">
+      <div class="stat-box"><div class="sv">${avgSpeed.toFixed(1)}</div><div class="sl">km/h w ruchu</div></div>
+      <div class="stat-box"><div class="sv">${avgFullAll.toFixed(1)}</div><div class="sl">km/h cały czas</div></div>
     </div>
 
     <div class="card" style="padding:16px;margin-bottom:16px;">
@@ -1096,11 +1109,20 @@ function renderStats() {
       </div>
     </div>
 
-    <div class="card" style="padding:16px;margin-bottom:24px;">
-      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">⚡ Wymagane tempo (km/h w ruchu)</div>
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">⚡ Wymagane tempo w ruchu (km/h)</div>
       ${barChart(spdBars, Math.max(...cycling.map(c=>c.s.speed))*1.1, '', null)}
       <div style="font-size:11px;color:#8b949e;margin-top:10px;line-height:1.5;padding-top:10px;border-top:1px solid #21262d;">
         🟢 &lt;12 km/h spokojne · 🔵 12–14 solidne · 🟠 14–16 wysokie · 🔴 16+ trzeba się cisnąć
+      </div>
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:24px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:12px;">🕐 Wymagane tempo cały czas (km/h, z przerwami)</div>
+      ${barChart(avgFullBars, Math.max(...cycling.map(c=>c.s.avgFull))*1.1, '', null)}
+      <div style="font-size:11px;color:#8b949e;margin-top:10px;line-height:1.5;padding-top:10px;border-top:1px solid #21262d;">
+        Ta wartość liczy dystans przez całe okno etapu (start → meta), łącznie z przerwami. Sprawdzasz zegarek w trakcie dnia i porównujesz z tym tempem — łatwiej monitorować niż liczyć czas w ruchu.<br>
+        🟢 &lt;8 km/h spokojnie · 🔵 8–10 solidnie · 🟠 10–12 pilnuj czasu · 🔴 12+ ryzyko spóźnienia
       </div>
     </div>
 
@@ -1120,7 +1142,7 @@ function renderStats() {
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
             <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
               <div style="font-size:16px;font-weight:800;">${c.d.km}</div>
               <div style="font-size:10px;color:#8b949e;">km</div>
@@ -1133,9 +1155,15 @@ function renderStats() {
               <div style="font-size:16px;font-weight:800;color:${c.s.score.color};">${c.s.score.score.toFixed(1)}</div>
               <div style="font-size:10px;color:#8b949e;">effort /10</div>
             </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;">
             <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
               <div style="font-size:16px;font-weight:800;color:${c.s.spdCol};">${c.s.speed.toFixed(1)}</div>
-              <div style="font-size:10px;color:#8b949e;">km/h</div>
+              <div style="font-size:10px;color:#8b949e;">km/h w ruchu</div>
+            </div>
+            <div style="background:#0d1117;border-radius:8px;padding:8px;text-align:center;">
+              <div style="font-size:16px;font-weight:800;color:${c.s.avgFullCol};">${c.s.avgFull.toFixed(1)}</div>
+              <div style="font-size:10px;color:#8b949e;">km/h cały czas</div>
             </div>
           </div>
 
@@ -1227,11 +1255,14 @@ function dayCard(d, idx, isOpen) {
   // Mini statystyki dnia
   const s = computeDayStats(d);
   if (s) {
-    body += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+    body += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;">
       <div class="mini-stat"><div class="mv">${d.km}</div><div class="ml">km</div></div>
       <div class="mini-stat"><div class="mv">${d.el}</div><div class="ml">m ⛰️</div></div>
       <div class="mini-stat"><div class="mv" style="color:${s.score.color};">${s.score.score.toFixed(1)}</div><div class="ml">effort /10</div></div>
-      <div class="mini-stat"><div class="mv" style="color:${s.spdCol};">${s.speed.toFixed(1)}</div><div class="ml">km/h ⚡</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;">
+      <div class="mini-stat"><div class="mv" style="color:${s.spdCol};">${s.speed.toFixed(1)}</div><div class="ml">km/h w ruchu ⚡</div></div>
+      <div class="mini-stat"><div class="mv" style="color:${s.avgFullCol};">${s.avgFull.toFixed(1)}</div><div class="ml">km/h cały czas 🕐</div></div>
     </div>`;
   }
 
