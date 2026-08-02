@@ -1159,6 +1159,19 @@ function defaultCyclingIdx() {
 function selectTodayDay(i) { todayDayIdx = parseInt(i,10); renderToday(); }
 function paceColor(v) { return v<12?'#56d364': v<14?'#79c0ff': v<16?'#ffa657':'#ff7b72'; }
 
+function getLiveProgress(d, s) {
+  const riddenKm = Math.min(d.km, Math.max(0, parseFloat(ov(`day.${d.day}.riddenKm`,'0'))||0));
+  const riddenAt = ov(`day.${d.day}.riddenAt`, null);
+  const remainingKm = Math.max(0, d.km - riddenKm);
+  const frac = d.km ? riddenKm/d.km : 0;
+  const nowStr = new Date().toTimeString().slice(0,5);
+  const elapsedSinceStart = timeDiffHours(nowStr, s.actualStart);
+  const remainingH = Math.max(0.05, timeDiffHours(s.endTime, nowStr));
+  const requiredPace = remainingKm / remainingH;
+  const paceSoFar = elapsedSinceStart > 0.05 ? riddenKm/elapsedSinceStart : null;
+  return { riddenKm, riddenAt, remainingKm, frac, requiredPace, paceSoFar };
+}
+
 async function setRiddenKm(day, maxKm, value) {
   const v = Math.max(0, Math.min(maxKm, parseFloat(value)||0));
   await saveField(`day.${day}.riddenKm`, String(v));
@@ -1212,18 +1225,7 @@ async function renderToday() {
 
 function renderTodayUI(d, cyclingDays, profile, s, wind) {
   const c = document.getElementById('ttoday');
-  const riddenKey = `day.${d.day}.riddenKm`;
-  const riddenAtKey = `day.${d.day}.riddenAt`;
-  const riddenKm = Math.min(d.km, Math.max(0, parseFloat(ov(riddenKey,'0'))||0));
-  const riddenAt = ov(riddenAtKey, null);
-  const remainingKm = Math.max(0, d.km - riddenKm);
-  const frac = d.km ? riddenKm/d.km : 0;
-
-  const nowStr = new Date().toTimeString().slice(0,5);
-  const elapsedSinceStart = timeDiffHours(nowStr, s.actualStart);
-  const remainingH = Math.max(0.05, timeDiffHours(s.endTime, nowStr));
-  const requiredPace = remainingKm / remainingH;
-  const paceSoFar = elapsedSinceStart > 0.05 ? riddenKm/elapsedSinceStart : null;
+  const { riddenKm, riddenAt, remainingKm, frac, requiredPace, paceSoFar } = getLiveProgress(d, s);
 
   const idx = profile ? Math.max(0,Math.min(profile.dist.length-1, Math.round(frac*(profile.dist.length-1)))) : 0;
   const gainRemaining = profile ? Math.round(profile.totalGain - profile.gain[idx]) : null;
@@ -1595,7 +1597,7 @@ async function init() {
   await flushPending();
 
   setInterval(()=>{
-    if (document.getElementById('tst').style.display !== 'none' && !document.hidden) renderStart();
+    if (document.getElementById('tst').style.display !== 'none' && !document.hidden && computeTripPhase() !== 'active') renderStart();
   }, 1000);
   setInterval(async()=>{
     if (!navigator.onLine || document.hidden) return;
@@ -1637,88 +1639,45 @@ function goTab(name) {
 }
 
 // ===== START =====
-function renderStart() {
+function computeTripPhase() {
   const now = new Date();
-  const trip = new Date('2026-08-05T19:25:00');
-  const returnDate = new Date('2026-08-12T21:20:00');
-  const diff = trip - now;
-  const past = diff < 0;
-  const active = now >= trip && now <= returnDate;
+  const tripStart = new Date('2026-08-05T19:25:00');
+  const tripEnd = new Date('2026-08-12T21:20:00');
+  if (now < tripStart) return 'before';
+  if (now <= tripEnd) return 'active';
+  return 'after';
+}
 
-  const days = Math.floor(Math.abs(diff)/86400000);
-  const hrs = Math.floor((Math.abs(diff)%86400000)/3600000);
-  const mins = Math.floor((Math.abs(diff)%3600000)/60000);
-  const secs = Math.floor((Math.abs(diff)%60000)/1000);
+function findTodayDaysEntry() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const todayIso = `2026-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const exact = DAYS.find(d => wxIsoDate(d.date) === todayIso);
+  if (exact) return exact;
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const upcoming = DAYS.find(d => new Date(wxIsoDate(d.date)+'T00:00:00') >= todayDate);
+  return upcoming || DAYS[DAYS.length-1];
+}
 
-  const cdLabel = active ? 'Wyprawa w toku!' : (past ? 'Wyprawa zakończona' : 'Do wyjazdu zostało');
+function wxSnapshotNow(data) {
+  if (!data) return null;
+  const times = data.hourly.time;
+  const nowIso = new Date().toISOString().slice(0,13);
+  let idx = times.findIndex(t => t.slice(0,13) === nowIso);
+  if (idx === -1) idx = 0;
+  const temp = data.hourly.temperature_2m[idx];
+  const precip = data.hourly.precipitation[idx] || 0;
+  const cLow = data.hourly.cloud_cover_low[idx]||0, cMid = data.hourly.cloud_cover_mid[idx]||0, cHi = data.hourly.cloud_cover_high[idx]||0;
+  const cloud = cLow*0.4 + cMid*0.35 + cHi*0.25;
+  const dateStr = times[idx].slice(0,10);
+  const sunIdx = (data.daily.time||[]).indexOf(dateStr);
+  let isNight = false;
+  if (sunIdx>=0) { const rise=data.daily.sunrise[sunIdx], set=data.daily.sunset[sunIdx]; isNight = times[idx] < rise || times[idx] > set; }
+  return { temp: Math.round(temp), icon: wxIcon(precip, cloud, isNight) };
+}
 
-  const tasksAll = tasks.length * 3;
-  const tasksDone = tasks.reduce((sum,t)=>sum + (t.dan_checked?1:0)+(t.kuba_checked?1:0)+(t.maciek_checked?1:0), 0);
-  const pkgAll = pkgs.length * 3;
-  const pkgDone = pkgs.reduce((sum,i)=>sum + (i.dan_checked?1:0)+(i.kuba_checked?1:0)+(i.maciek_checked?1:0), 0);
-  const tPct = tasksAll ? Math.round(tasksDone/tasksAll*100) : 0;
-  const pPct = pkgAll ? Math.round(pkgDone/pkgAll*100) : 0;
-
-  // per-person progress
-  const perPerson = PS.map(p=>{
-    const tD = tasks.filter(t=>t[p+'_checked']).length;
-    const pD = pkgs.filter(i=>i[p+'_checked']).length;
-    return {p, tD, tT: tasks.length, pD, pT: pkgs.length};
-  });
-
-  // next day
-  let nextDay = null;
-  if (!past) {
-    const dayDates = [
-      {i:0, d: new Date('2026-08-05')},
-      {i:1, d: new Date('2026-08-06')},
-      {i:2, d: new Date('2026-08-07')},
-      {i:3, d: new Date('2026-08-08')},
-      {i:4, d: new Date('2026-08-09')},
-      {i:5, d: new Date('2026-08-10')},
-      {i:6, d: new Date('2026-08-11')},
-      {i:7, d: new Date('2026-08-12')},
-    ];
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const upcoming = dayDates.find(dd => dd.d >= today);
-    if (upcoming) nextDay = DAYS[upcoming.i];
-  }
-
-  document.getElementById('tst').innerHTML = `
-    <div class="hero">
-      <div style="font-size:52px;line-height:1;margin-bottom:8px;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
-      <div style="font-size:22px;font-weight:800;">Highlands 2026</div>
-      <div style="font-size:13px;color:#8b949e;margin-top:4px;">5 – 12 sierpnia · Inverness Loop · 513 km · 3 osoby</div>
-      <div style="margin-top:22px;">
-        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${cdLabel}</div>
-        <div class="cd">
-          <div class="cd-box"><div class="cd-v">${days}</div><div class="cd-l">${days===1?'dzień':'dni'}</div></div>
-          <div class="cd-box"><div class="cd-v">${hrs}</div><div class="cd-l">godz</div></div>
-          <div class="cd-box"><div class="cd-v">${mins}</div><div class="cd-l">min</div></div>
-          <div class="cd-box"><div class="cd-v">${secs}</div><div class="cd-l">sek</div></div>
-        </div>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
-      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">513</div><div class="sl">km na rowerze</div></div>
-      <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">5 692</div><div class="sl">m przewyższenia</div></div>
-      <div class="stat-box" style="cursor:pointer;" onclick="goTab('budget')" title="Zobacz koszty"><div class="sv">5 123</div><div class="sl">PLN / osoba</div></div>
-    </div>
-
-    ${nextDay ? `
-    <div class="next-card">
-      <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Następny etap</div>
-      <div style="display:flex;gap:12px;align-items:center;">
-        <div style="font-size:32px;">${nextDay.ico}</div>
-        <div style="flex:1;">
-          <div style="font-weight:700;font-size:15px;">${esc(nextDay.title)}</div>
-          <div style="font-size:12px;color:#8b949e;">${nextDay.date} · ${nextDay.dow}</div>
-        </div>
-        <button class="btn btn-sm" onclick="goTab('plan')">Zobacz →</button>
-      </div>
-    </div>` : ''}
-
+function renderStartCommon(tasksDone, tasksAll, tPct, pkgDone, pkgAll, pPct, perPerson) {
+  return `
     <div class="card" style="padding:16px;margin-bottom:16px;">
       <div style="font-size:14px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px;">✅ Postęp zadań <span style="color:#8b949e;font-weight:500;font-size:12px;margin-left:auto;">${tasksDone}/${tasksAll}</span></div>
       <div class="pbar"><div style="width:${tPct}%;"></div></div>
@@ -1759,6 +1718,162 @@ function renderStart() {
       <button class="btn" onclick="goTab('tasks')" style="justify-content:center;padding:14px;">✅ Zadania</button>
       <button class="btn" onclick="goTab('packing')" style="justify-content:center;padding:14px;">🎒 Pakowanie</button>
     </div>
+  `;
+}
+
+async function renderStart() {
+  const c = document.getElementById('tst');
+  const phase = computeTripPhase();
+
+  const tasksAll = tasks.length * 3;
+  const tasksDone = tasks.reduce((sum,t)=>sum + (t.dan_checked?1:0)+(t.kuba_checked?1:0)+(t.maciek_checked?1:0), 0);
+  const pkgAll = pkgs.length * 3;
+  const pkgDone = pkgs.reduce((sum,i)=>sum + (i.dan_checked?1:0)+(i.kuba_checked?1:0)+(i.maciek_checked?1:0), 0);
+  const tPct = tasksAll ? Math.round(tasksDone/tasksAll*100) : 0;
+  const pPct = pkgAll ? Math.round(pkgDone/pkgAll*100) : 0;
+  const perPerson = PS.map(p=>{
+    const tD = tasks.filter(t=>t[p+'_checked']).length;
+    const pD = pkgs.filter(i=>i[p+'_checked']).length;
+    return {p, tD, tT: tasks.length, pD, pT: pkgs.length};
+  });
+  const common = renderStartCommon(tasksDone, tasksAll, tPct, pkgDone, pkgAll, pPct, perPerson);
+
+  if (phase !== 'active') {
+    const now = new Date();
+    const trip = new Date('2026-08-05T19:25:00');
+    const diff = trip - now;
+    const past = phase === 'after';
+    const days = Math.floor(Math.abs(diff)/86400000);
+    const hrs = Math.floor((Math.abs(diff)%86400000)/3600000);
+    const mins = Math.floor((Math.abs(diff)%3600000)/60000);
+    const secs = Math.floor((Math.abs(diff)%60000)/1000);
+    const cdLabel = past ? 'Wyprawa zakończona' : 'Do wyjazdu zostało';
+
+    let nextDay = null;
+    if (!past) {
+      const dayDates = [
+        {i:0, d: new Date('2026-08-05')}, {i:1, d: new Date('2026-08-06')}, {i:2, d: new Date('2026-08-07')},
+        {i:3, d: new Date('2026-08-08')}, {i:4, d: new Date('2026-08-09')}, {i:5, d: new Date('2026-08-10')},
+        {i:6, d: new Date('2026-08-11')}, {i:7, d: new Date('2026-08-12')},
+      ];
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const upcoming = dayDates.find(dd => dd.d >= today);
+      if (upcoming) nextDay = DAYS[upcoming.i];
+    }
+
+    c.innerHTML = `
+      <div class="hero">
+        <div style="font-size:52px;line-height:1;margin-bottom:8px;">🏴󠁧󠁢󠁳󠁣󠁴󠁿</div>
+        <div style="font-size:22px;font-weight:800;">Highlands 2026</div>
+        <div style="font-size:13px;color:#8b949e;margin-top:4px;">5 – 12 sierpnia · Inverness Loop · 513 km · 3 osoby</div>
+        <div style="margin-top:22px;">
+          <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;">${cdLabel}</div>
+          <div class="cd">
+            <div class="cd-box"><div class="cd-v">${days}</div><div class="cd-l">${days===1?'dzień':'dni'}</div></div>
+            <div class="cd-box"><div class="cd-v">${hrs}</div><div class="cd-l">godz</div></div>
+            <div class="cd-box"><div class="cd-v">${mins}</div><div class="cd-l">min</div></div>
+            <div class="cd-box"><div class="cd-v">${secs}</div><div class="cd-l">sek</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">
+        <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">513</div><div class="sl">km na rowerze</div></div>
+        <div class="stat-box" style="cursor:pointer;" onclick="goTab('stats')" title="Zobacz statystyki"><div class="sv">5 692</div><div class="sl">m przewyższenia</div></div>
+        <div class="stat-box" style="cursor:pointer;" onclick="goTab('budget')" title="Zobacz koszty"><div class="sv">5 123</div><div class="sl">PLN / osoba</div></div>
+      </div>
+
+      ${nextDay ? `
+      <div class="next-card">
+        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px;">Następny etap</div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div style="font-size:32px;">${nextDay.ico}</div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:15px;">${esc(nextDay.title)}</div>
+            <div style="font-size:12px;color:#8b949e;">${nextDay.date} · ${nextDay.dow}</div>
+          </div>
+          <button class="btn btn-sm" onclick="goTab('plan')">Zobacz →</button>
+        </div>
+      </div>` : ''}
+
+      ${common}
+    `;
+    return;
+  }
+
+  // ACTIVE — "Dziś" live dashboard
+  c.innerHTML = `<div class="hero"><div style="padding:40px 20px;color:#8b949e;">Ładowanie dzisiejszego etapu…</div></div>` + common;
+
+  const d = findTodayDaysEntry();
+  const s = d.km ? computeDayStats(d) : null;
+  const locIdx = WEATHER_LOCATIONS.findIndex(l => l.date === d.date);
+  const wxData = locIdx >= 0 ? await wxEnsureData(locIdx) : null;
+  const snap = wxSnapshotNow(wxData);
+  const profile = d.km ? await getGpxProfile(d) : null;
+  const wind = (d.km && profile && s) ? await getWindForDay(d, profile, s) : null;
+  const progress = s ? getLiveProgress(d, s) : null;
+
+  const accName = d.acc && d.acc.name ? ov(`day.${d.day}.acc.name`, d.acc.name) : null;
+  const shop = d.shop ? ov(`day.${d.day}.shop`, d.shop) : null;
+  const rest = d.rest ? ov(`day.${d.day}.rest`, d.rest) : null;
+  const notes = ov(`day.${d.day}.notes`, d.notes);
+
+  c.innerHTML = `
+    <div class="hero">
+      <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Dziś · ${d.date} · ${d.dow}</div>
+      <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-top:6px;">
+        <span style="font-size:34px;">${d.ico}</span>
+        <div style="font-size:20px;font-weight:800;">${esc(ov(`day.${d.day}.title`, d.title))}</div>
+      </div>
+      <div style="font-size:13px;color:#8b949e;margin-top:4px;">${esc(ov(`day.${d.day}.desc`, d.desc||''))}</div>
+
+      ${snap ? `<div style="margin-top:16px;display:flex;align-items:center;justify-content:center;gap:10px;">
+        <span style="font-size:30px;">${snap.icon}</span>
+        <span style="font-size:26px;font-weight:800;">${snap.temp}°C</span>
+      </div>` : ''}
+
+      ${s ? `<div class="cd" style="margin-top:18px;">
+        <div class="cd-box"><div class="cd-v">${d.km}</div><div class="cd-l">km</div></div>
+        <div class="cd-box"><div class="cd-v">${d.el}</div><div class="cd-l">m ⛰️</div></div>
+        <div class="cd-box"><div class="cd-v" style="color:${s.score.color};">${s.score.score.toFixed(1)}</div><div class="cd-l">effort</div></div>
+        <div class="cd-box"><div class="cd-v" style="color:${paceColor(s.speed)};">${s.speed.toFixed(1)}</div><div class="cd-l">km/h</div></div>
+      </div>` : ''}
+
+      ${wind ? `<div style="margin-top:12px;"><span class="badge" style="background:${wind.color}22;color:${wind.color};border:1px solid ${wind.color};">${wind.icon} ${Math.round(wind.avgSpeed)} km/h · ${wind.label}</span></div>` : ''}
+    </div>
+
+    ${progress ? `
+    <div class="next-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;font-weight:600;">Postęp dzisiaj</div>
+        <div style="font-size:12px;color:#8b949e;">${progress.riddenKm.toFixed(1)} / ${d.km} km</div>
+      </div>
+      <div class="pbar"><div style="width:${Math.round(progress.frac*100)}%;"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:#8b949e;flex-wrap:wrap;gap:6px;">
+        <div>Zostało: <strong style="color:#e6edf3;">${progress.remainingKm.toFixed(1)} km</strong></div>
+        <div>Wymagane tempo: <strong style="color:${paceColor(progress.requiredPace)};">${isFinite(progress.requiredPace)&&progress.remainingKm>0?progress.requiredPace.toFixed(1):'–'} km/h</strong></div>
+      </div>
+      <button class="btn btn-sm" style="margin-top:12px;width:100%;justify-content:center;" onclick="goTab('today')">Zaktualizuj postęp →</button>
+    </div>` : (d.km ? `
+    <div class="next-card">
+      <div style="font-size:13px;color:#8b949e;margin-bottom:10px;">Nie wpisano jeszcze dzisiejszego postępu.</div>
+      <button class="btn btn-g" style="width:100%;justify-content:center;" onclick="goTab('today')">🎯 Wpisz przejechane km</button>
+    </div>` : '')}
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      ${shop ? `<div class="irow" style="border-top:none;"><div class="ico">🛒</div><div class="ilbl">Sklep</div><div>${esc(shop)}</div></div>` : ''}
+      ${rest ? `<div class="irow"><div class="ico">🍽️</div><div class="ilbl">Restauracja</div><div>${esc(rest)}</div></div>` : ''}
+      ${accName ? `<div class="irow"><div class="ico">🏠</div><div class="ilbl">Nocleg</div><div>${esc(accName)}</div></div>` : ''}
+      ${notes ? `<div class="irow" style="color:#ffa657;"><div class="ico">📝</div><div class="ilbl">Uwagi</div><div>${esc(notes)}</div></div>` : ''}
+      ${!shop && !rest && !accName && !notes ? '<div style="color:#8b949e;font-size:13px;">Brak dodatkowych informacji na dziś.</div>' : ''}
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">
+      <button class="btn" onclick="goTab('plan')" style="justify-content:center;padding:14px;">📅 Pełny plan dnia</button>
+      <button class="btn" onclick="goTab('weather')" style="justify-content:center;padding:14px;">🌤️ Pełna pogoda</button>
+    </div>
+
+    ${common}
   `;
 }
 
