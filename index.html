@@ -126,6 +126,7 @@ tr:last-child td { border-bottom: none; }
     <button class="tab on" data-tab="start" onclick="goTab('start')">🏠 Start</button>
     <button class="tab" data-tab="plan" onclick="goTab('plan')">📅 Plan</button>
     <button class="tab" data-tab="today" onclick="goTab('today')">🎯 Dziś</button>
+    <button class="tab" data-tab="relacja" onclick="goTab('relacja')">📸 Relacja</button>
     <button class="tab" data-tab="stats" onclick="goTab('stats')">📊 Statystyki</button>
     <button class="tab" data-tab="sights" onclick="goTab('sights')">🏰 Zwiedzanie</button>
     <button class="tab" data-tab="weather" onclick="goTab('weather')">🌤️ Pogoda</button>
@@ -150,6 +151,8 @@ tr:last-child td { border-bottom: none; }
 <div id="tstat" style="display:none;"></div>
 
 <div id="ttoday" style="display:none;"></div>
+
+<div id="trel" style="display:none;"></div>
 
 <div id="ts" style="display:none;">
   <div class="sh">🏰 Zwiedzanie na trasie</div>
@@ -470,8 +473,12 @@ const SB_URL = 'https://axbgkvswfzsrvtvjrskh.supabase.co';
 const SB_KEY = 'sb_publishable_fLytrxqd7-8T79l-YA9xig_ZAw7c2oN';
 const db = supabase.createClient(SB_URL, SB_KEY);
 
+const PUB_URL = 'https://evlmgtoysvcumluwmusa.supabase.co';
+const PUB_KEY = 'sb_publishable_EBGf9roabpx5-brXuia6ug_YWkOVc4K';
+const pub = supabase.createClient(PUB_URL, PUB_KEY);
+
 // ===== OFFLINE CACHE + WRITE QUEUE =====
-const CK = { tasks:'hlds_c_tasks', pkgs:'hlds_c_pkgs', sights:'hlds_c_sights', content:'hlds_c_content', expenses:'hlds_c_expenses' };
+const CK = { tasks:'hlds_c_tasks', pkgs:'hlds_c_pkgs', sights:'hlds_c_sights', content:'hlds_c_content', expenses:'hlds_c_expenses', updates:'hlds_c_updates', livetrack:'hlds_c_livetrack', progress:'hlds_c_progress' };
 const PENDING_KEY = 'hlds_pending';
 function cacheGet(key, def) { try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v!==null ? v : def; } catch { return def; } }
 function cacheSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
@@ -488,11 +495,12 @@ async function flushPending() {
   if (!q.length || !navigator.onLine) return;
   const remaining = [];
   for (const item of q) {
+    const client = item.target === 'pub' ? pub : db;
     try {
-      if (item.op === 'update') { const r = await db.from(item.table).update(item.data).eq('id', item.id); if (r.error) throw r.error; }
-      else if (item.op === 'insert') { const r = await db.from(item.table).insert(item.data); if (r.error) throw r.error; }
-      else if (item.op === 'upsert') { const r = await db.from(item.table).upsert(item.data); if (r.error) throw r.error; }
-      else if (item.op === 'delete') { const r = await db.from(item.table).delete().eq('id', item.id); if (r.error) throw r.error; }
+      if (item.op === 'update') { const r = await client.from(item.table).update(item.data).eq('id', item.id); if (r.error) throw r.error; }
+      else if (item.op === 'insert') { const r = await client.from(item.table).insert(item.data); if (r.error) throw r.error; }
+      else if (item.op === 'upsert') { const r = await client.from(item.table).upsert(item.data); if (r.error) throw r.error; }
+      else if (item.op === 'delete') { const r = await client.from(item.table).delete().eq('id', item.id); if (r.error) throw r.error; }
     } catch (e) { remaining.push(item); console.warn('flushPending item failed:', e); break; }
   }
   cacheSet(PENDING_KEY, remaining);
@@ -525,6 +533,11 @@ let tasks = [];
 let sights = [];
 let content = {};
 let editMode = false;
+let updates = [];
+let livetrack = [];
+let progressPub = { day:null, ridden_km:0, total_km:513, updated_at:null };
+let relPendingFile = null;
+let relPendingGps = null;
 
 const PS = ['dan','kuba','maciek'];
 const PL = {dan:'Michał',kuba:'Kuba',maciek:'Maciek'};
@@ -1177,6 +1190,15 @@ async function setRiddenKm(day, maxKm, value) {
   await saveField(`day.${day}.riddenKm`, String(v));
   await saveField(`day.${day}.riddenAt`, new Date().toISOString());
   renderToday();
+  await publishProgress(day, v);
+}
+
+async function publishProgress(day, riddenKm) {
+  const payload = { id:'current', day, ridden_km:riddenKm, total_km:513, updated_at:new Date().toISOString() };
+  progressPub = payload; cacheSet(CK.progress, progressPub);
+  try { const r = await pub.from('progress').upsert(payload); if (r.error) throw r.error; }
+  catch(e){ queueWrite({ target:'pub', table:'progress', op:'upsert', data:payload }); }
+  if (document.getElementById('trel').style.display !== 'none') renderRelacja();
 }
 
 function buildElevationSvg(profile, frac) {
@@ -1424,6 +1446,38 @@ async function loadExpenses() {
     return true;
   } catch(e){ console.warn('loadExpenses (cache):', e.message); return false; }
 }
+
+async function loadUpdates() {
+  updates = cacheGet(CK.updates, []);
+  try {
+    const {data,error} = await pub.from('updates').select('*').order('created_at', {ascending:false});
+    if (error) throw error;
+    updates = data||[];
+    cacheSet(CK.updates, updates);
+    return true;
+  } catch(e){ console.warn('loadUpdates (cache):', e.message); return false; }
+}
+async function loadLivetrack() {
+  livetrack = cacheGet(CK.livetrack, []);
+  try {
+    const {data,error} = await pub.from('livetrack').select('*');
+    if (error) throw error;
+    livetrack = data||[];
+    cacheSet(CK.livetrack, livetrack);
+    return true;
+  } catch(e){ console.warn('loadLivetrack (cache):', e.message); return false; }
+}
+async function loadProgressPub() {
+  progressPub = cacheGet(CK.progress, { day:null, ridden_km:0, total_km:513, updated_at:null });
+  try {
+    const {data,error} = await pub.from('progress').select('*').eq('id','current').maybeSingle();
+    if (error) throw error;
+    if (data) progressPub = data;
+    cacheSet(CK.progress, progressPub);
+    return true;
+  } catch(e){ console.warn('loadProgressPub (cache):', e.message); return false; }
+}
+
 async function addExpense() {
   if (!expPaidBy) expPaidBy = me || 'dan';
   const descEl = document.getElementById('expDesc');
@@ -1561,19 +1615,367 @@ function renderExpensesTab() {
   `;
 }
 
+// ===== RELACJA (LP publiczny) =====
+const ROUTES = {"2":[[57.4789,-4.2234,17],[57.4777,-4.2247,15],[57.477,-4.2244,18],[57.4755,-4.225,24],[57.475,-4.2254,17],[57.4723,-4.2265,10],[57.4691,-4.2273,10],[57.4657,-4.2276,12],[57.4643,-4.2282,14],[57.4626,-4.2279,19],[57.4608,-4.2272,34],[57.4586,-4.231,40],[57.4568,-4.2343,40],[57.455,-4.2364,40],[57.4523,-4.237,40],[57.4495,-4.2388,40],[57.4479,-4.2387,40],[57.4461,-4.2393,43],[57.4444,-4.239,45],[57.4442,-4.2402,49],[57.4426,-4.2418,49],[57.4417,-4.2461,50],[57.4394,-4.253,50],[57.4377,-4.2574,50],[57.4387,-4.2624,50],[57.4365,-4.268,50],[57.4312,-4.2777,42],[57.4287,-4.2828,40],[57.4241,-4.2849,40],[57.4147,-4.2937,40],[57.4043,-4.3048,49],[57.4005,-4.3059,70],[57.3994,-4.3135,57],[57.3983,-4.3153,46],[57.3976,-4.3173,40],[57.3958,-4.3197,40],[57.3903,-4.3274,36],[57.3847,-4.3294,30],[57.3821,-4.3325,30],[57.3781,-4.3363,30],[57.3707,-4.3452,30],[57.3623,-4.356,30],[57.3556,-4.3622,31],[57.3423,-4.3785,40],[57.3282,-4.403,34],[57.3197,-4.4118,33],[57.314,-4.4183,30],[57.3077,-4.4262,40],[57.3029,-4.4335,48],[57.298,-4.4385,37],[57.2936,-4.445,30],[57.2859,-4.4525,40],[57.2817,-4.454,47],[57.2791,-4.4588,60],[57.2682,-4.4727,100],[57.2605,-4.4821,100],[57.2531,-4.4903,115],[57.2533,-4.4904,110],[57.2533,-4.4921,85],[57.251,-4.4912,135],[57.249,-4.4902,150],[57.2466,-4.4889,144],[57.2453,-4.491,131],[57.2426,-4.4936,139],[57.2405,-4.4961,149],[57.2358,-4.4979,150],[57.2337,-4.4973,150],[57.2323,-4.4985,150],[57.2306,-4.4995,150],[57.2294,-4.5013,150],[57.2269,-4.503,155],[57.2247,-4.5037,158],[57.2232,-4.5037,160],[57.2207,-4.5032,163],[57.2183,-4.5036,166],[57.2161,-4.503,169],[57.215,-4.5037,171],[57.2112,-4.5047,181],[57.207,-4.5049,180],[57.2037,-4.5041,192],[57.2008,-4.5096,204],[57.1992,-4.5093,206],[57.1961,-4.5085,209],[57.1948,-4.5047,211],[57.1844,-4.5193,221],[57.1809,-4.5222,227],[57.1824,-4.5255,228],[57.1813,-4.5295,229],[57.1798,-4.5297,229],[57.1788,-4.5292,229],[57.1796,-4.5318,230],[57.181,-4.5333,241],[57.1823,-4.5345,248],[57.1821,-4.5372,261],[57.18,-4.5425,270],[57.1791,-4.546,266],[57.1786,-4.5498,258],[57.1771,-4.5537,264],[57.1755,-4.5547,282],[57.1745,-4.5539,297],[57.1737,-4.5529,305],[57.1729,-4.5528,310],[57.1713,-4.5542,313],[57.169,-4.5601,317],[57.1646,-4.5644,338],[57.1637,-4.5639,357],[57.1622,-4.5658,367],[57.1596,-4.566,393],[57.1586,-4.57,416],[57.1586,-4.5712,428],[57.1582,-4.574,430],[57.1578,-4.5759,439],[57.1577,-4.5779,440],[57.1575,-4.5797,436],[57.1572,-4.582,431],[57.1567,-4.5835,420],[57.1565,-4.586,409],[57.1565,-4.5873,398],[57.156,-4.5884,385],[57.1561,-4.5901,369],[57.1558,-4.5913,357],[57.1557,-4.5925,351],[57.1554,-4.5945,342],[57.1553,-4.5963,331],[57.1542,-4.5952,318],[57.1536,-4.5959,306],[57.153,-4.5957,300],[57.1518,-4.5978,298],[57.1505,-4.6006,297],[57.1489,-4.6089,293],[57.1476,-4.6134,290],[57.1427,-4.6227,235],[57.1421,-4.6319,178],[57.1435,-4.637,171],[57.1444,-4.642,179],[57.144,-4.647,200],[57.1446,-4.6493,197],[57.1428,-4.6522,165],[57.1409,-4.6552,141],[57.1396,-4.6586,120],[57.1386,-4.6608,101],[57.1377,-4.6637,70],[57.1382,-4.6652,58],[57.1375,-4.6688,37],[57.1393,-4.6765,20],[57.142,-4.6791,21],[57.144,-4.6798,24],[57.1451,-4.6807,20],[57.1465,-4.6813,20],[57.1475,-4.6805,26],[57.1477,-4.6832,39]],"3":[[57.1476,-4.6833,39],[57.1508,-4.6844,40],[57.1531,-4.679,30],[57.1552,-4.6729,30],[57.1594,-4.6631,50],[57.1601,-4.6615,55],[57.1623,-4.6596,70],[57.1626,-4.6641,108],[57.1614,-4.6719,139],[57.16,-4.6799,165],[57.1592,-4.6903,207],[57.1554,-4.7063,247],[57.1525,-4.7216,280],[57.1527,-4.7334,333],[57.1506,-4.7479,385],[57.1577,-4.7666,363],[57.1629,-4.7728,330],[57.1676,-4.7789,296],[57.1693,-4.7852,251],[57.1683,-4.8059,181],[57.1737,-4.8009,130],[57.1767,-4.7988,120],[57.1823,-4.8023,155],[57.1854,-4.808,226],[57.1908,-4.813,306],[57.1963,-4.8195,346],[57.2008,-4.8256,340],[57.207,-4.8278,411],[57.2141,-4.8308,508],[57.2217,-4.8301,530],[57.2276,-4.8268,550],[57.2302,-4.8274,549],[57.2347,-4.8286,542],[57.2361,-4.8304,530],[57.2378,-4.8306,508],[57.2451,-4.8317,477],[57.2547,-4.8325,386],[57.2622,-4.8348,328],[57.2646,-4.8324,324],[57.2661,-4.8291,322],[57.2704,-4.8236,310],[57.2739,-4.8225,305],[57.2772,-4.8251,297],[57.284,-4.82,244],[57.2885,-4.8208,200],[57.2947,-4.8196,140],[57.3007,-4.8142,126],[57.3052,-4.8117,100],[57.3012,-4.8213,110],[57.2929,-4.8338,110],[57.2889,-4.8476,114],[57.29,-4.8508,188],[57.2887,-4.8644,261],[57.2903,-4.879,310],[57.2921,-4.8885,310],[57.292,-4.896,279],[57.2881,-4.9056,257],[57.2831,-4.914,252],[57.2773,-4.919,249],[57.2731,-4.9311,240],[57.272,-4.9363,240],[57.2706,-4.9443,240],[57.2688,-4.9527,240],[57.2671,-4.9604,240],[57.2645,-4.9634,240],[57.2618,-4.968,240],[57.261,-4.973,235],[57.262,-4.98,240],[57.2629,-4.989,240],[57.2594,-5.0067,250],[57.2553,-5.02,257],[57.2526,-5.0219,275],[57.2516,-5.0257,290],[57.2506,-5.03,299],[57.2491,-5.0379,280],[57.245,-5.0662,275],[57.2435,-5.0729,267],[57.2396,-5.0833,252],[57.2381,-5.0872,240],[57.2385,-5.0919,240],[57.2382,-5.0946,240],[57.2382,-5.0984,252],[57.2382,-5.1008,260],[57.239,-5.1026,260],[57.2396,-5.1042,260],[57.2397,-5.1085,270],[57.2394,-5.1167,254],[57.2394,-5.1259,250],[57.2389,-5.1307,250],[57.239,-5.1359,260],[57.2391,-5.1415,260],[57.2383,-5.152,250],[57.2358,-5.163,250],[57.2348,-5.1699,260],[57.2319,-5.1767,260],[57.2318,-5.1832,260],[57.2299,-5.1868,260],[57.2284,-5.193,263],[57.2269,-5.1962,266],[57.2263,-5.1971,268],[57.224,-5.2014,276],[57.2221,-5.2058,297],[57.2198,-5.2115,330],[57.2165,-5.2187,330],[57.2146,-5.2247,328],[57.2116,-5.2293,320],[57.2088,-5.2354,328],[57.2072,-5.2396,340],[57.2049,-5.243,340],[57.2038,-5.2464,340],[57.203,-5.25,320],[57.2039,-5.2524,306],[57.2042,-5.2538,300],[57.2044,-5.2569,300],[57.2033,-5.2605,300],[57.2032,-5.2638,300],[57.2035,-5.2674,310],[57.2036,-5.2711,303],[57.2035,-5.2746,259],[57.2016,-5.2775,200],[57.2019,-5.2813,178],[57.2022,-5.2854,146],[57.2025,-5.2893,117],[57.2032,-5.294,94],[57.2033,-5.2965,70],[57.2028,-5.2977,57],[57.2019,-5.2988,50],[57.203,-5.3034,50],[57.2049,-5.3129,50],[57.2082,-5.3206,35],[57.211,-5.3268,30],[57.2144,-5.3334,29],[57.2165,-5.3369,27],[57.2194,-5.3418,24],[57.2219,-5.3455,21],[57.2256,-5.3513,20],[57.2315,-5.3631,18],[57.229,-5.3565,20],[57.2324,-5.3676,16],[57.2349,-5.3735,12],[57.2349,-5.3802,10],[57.2311,-5.3897,10],[57.2282,-5.4012,10],[57.2248,-5.4092,10],[57.2237,-5.4133,10],[57.2199,-5.4176,10],[57.2157,-5.4235,10],[57.2126,-5.4207,10],[57.2134,-5.4356,17],[57.2186,-5.4445,10],[57.2223,-5.4477,10]],"4":[[57.2222,-5.4475,10],[57.2189,-5.4447,10],[57.2136,-5.436,13],[57.2113,-5.4275,10],[57.2149,-5.4231,10],[57.2186,-5.4185,10],[57.2248,-5.4096,10],[57.2294,-5.4032,10],[57.2343,-5.4069,10],[57.2339,-5.4148,20],[57.2343,-5.4265,20],[57.2379,-5.4395,50],[57.2399,-5.4527,40],[57.2431,-5.4595,30],[57.247,-5.4651,31],[57.2504,-5.4684,48],[57.2521,-5.4704,70],[57.2536,-5.4727,94],[57.2566,-5.4784,110],[57.2622,-5.4835,163],[57.2637,-5.4901,170],[57.2655,-5.4942,157],[57.2643,-5.4972,118],[57.2679,-5.5026,84],[57.2714,-5.5078,61],[57.2767,-5.5119,39],[57.2792,-5.5139,12],[57.2763,-5.5141,10],[57.2804,-5.5224,10],[57.2862,-5.5294,20],[57.2884,-5.5223,12],[57.2905,-5.5113,10],[57.2939,-5.4982,20],[57.2991,-5.4925,20],[57.3026,-5.49,20],[57.3076,-5.4885,14],[57.3111,-5.4841,30],[57.3147,-5.4711,10],[57.3159,-5.4649,10],[57.316,-5.461,10],[57.3158,-5.4565,10],[57.3158,-5.4509,10],[57.3167,-5.4468,10],[57.3187,-5.4446,10],[57.319,-5.4389,10],[57.3223,-5.4301,30],[57.3249,-5.4263,35],[57.3267,-5.4226,30],[57.3303,-5.4211,43],[57.3334,-5.4185,50],[57.3364,-5.4156,50],[57.3399,-5.4147,50],[57.342,-5.4116,60],[57.3446,-5.4069,79],[57.349,-5.4052,139],[57.3535,-5.4005,192],[57.3576,-5.4004,234],[57.3631,-5.3994,276],[57.3662,-5.4018,264],[57.3724,-5.3998,210],[57.375,-5.4007,190],[57.3767,-5.4037,190],[57.3789,-5.4073,183],[57.3799,-5.4103,152],[57.3814,-5.4141,123],[57.3822,-5.4184,98],[57.3825,-5.4217,66],[57.3835,-5.422,46],[57.3855,-5.4211,40],[57.3872,-5.4337,28],[57.3916,-5.4444,20],[57.3914,-5.4549,10],[57.394,-5.455,10],[57.3998,-5.454,58],[57.4038,-5.4476,60],[57.4086,-5.4449,10],[57.4144,-5.4376,10],[57.4194,-5.4306,10],[57.4214,-5.4288,10],[57.4234,-5.4329,10],[57.4327,-5.4448,10],[57.4459,-5.4195,30],[57.45,-5.4055,30],[57.4531,-5.3884,50],[57.4617,-5.367,44],[57.4647,-5.3593,40],[57.4715,-5.3485,40],[57.4757,-5.3422,40],[57.4791,-5.3352,50],[57.4803,-5.3343,55],[57.4821,-5.3336,73],[57.4826,-5.3344,83],[57.4834,-5.3414,93],[57.484,-5.3446,107],[57.486,-5.3474,150],[57.4868,-5.3484,179],[57.4885,-5.3472,223],[57.4904,-5.3485,259],[57.4921,-5.3497,311],[57.495,-5.3531,352],[57.4983,-5.3554,374],[57.5003,-5.3549,380],[57.5013,-5.3537,380],[57.5026,-5.3517,367],[57.5048,-5.3501,350],[57.507,-5.3484,350],[57.5088,-5.346,328],[57.5097,-5.3433,308],[57.5103,-5.3392,288],[57.5114,-5.3353,274],[57.5136,-5.33,246],[57.5157,-5.3271,231],[57.5182,-5.3246,198],[57.5189,-5.3229,184],[57.5195,-5.319,172],[57.5212,-5.3128,152],[57.5226,-5.3096,142],[57.525,-5.3028,118],[57.5257,-5.3012,116],[57.5301,-5.3008,107],[57.5348,-5.3027,101],[57.5389,-5.3103,100],[57.5422,-5.3025,109],[57.5459,-5.3031,152],[57.5489,-5.3088,178],[57.5495,-5.3158,170],[57.5488,-5.3219,144],[57.5531,-5.3353,100],[57.5623,-5.3412,100],[57.5662,-5.3432,100],[57.5716,-5.3352,98],[57.5752,-5.3251,83],[57.5805,-5.3153,72],[57.5963,-5.306,43],[57.6026,-5.305,33],[57.6041,-5.3002,30],[57.6037,-5.2893,40],[57.6011,-5.27,56],[57.5941,-5.2581,85],[57.5884,-5.2474,115],[57.5823,-5.2363,182],[57.5761,-5.2199,230],[57.5724,-5.2033,195],[57.5764,-5.1852,172],[57.5775,-5.1741,160],[57.5792,-5.151,167],[57.5798,-5.1329,160],[57.5787,-5.0963,170],[57.5784,-5.0794,160],[57.5762,-5.0795,160],[57.5739,-5.0813,163]],"5":[[57.5742,-5.0815,165],[57.5783,-5.0791,160],[57.5785,-5.0987,169],[57.5799,-5.1392,160],[57.5786,-5.1632,165],[57.5769,-5.1826,168],[57.5744,-5.1838,161],[57.5727,-5.1887,160],[57.5718,-5.1942,170],[57.571,-5.2006,173],[57.5706,-5.2073,180],[57.5697,-5.2134,186],[57.5727,-5.2145,226],[57.579,-5.2285,217],[57.5863,-5.2417,144],[57.5931,-5.2558,90],[57.6013,-5.2708,55],[57.6036,-5.2938,40],[57.6044,-5.3029,30],[57.6077,-5.3076,29],[57.6188,-5.3276,20],[57.6278,-5.3435,20],[57.6312,-5.352,20],[57.6368,-5.3653,20],[57.6514,-5.3895,21],[57.6547,-5.4062,26],[57.6542,-5.4146,24],[57.6645,-5.4399,20],[57.6726,-5.4629,40],[57.6752,-5.4855,20],[57.675,-5.499,21],[57.6811,-5.5157,20],[57.6819,-5.534,28],[57.6871,-5.5454,26],[57.6904,-5.5439,20],[57.6947,-5.5471,20],[57.7026,-5.5515,30],[57.7078,-5.5563,36],[57.7137,-5.5608,39],[57.7185,-5.5659,66],[57.7213,-5.5749,128],[57.7225,-5.5798,177],[57.7246,-5.5862,233],[57.7281,-5.5899,226],[57.7334,-5.5945,199],[57.7373,-5.5968,160],[57.7423,-5.5993,107],[57.7452,-5.5995,92],[57.7491,-5.5983,77],[57.7571,-5.5988,20],[57.7655,-5.6037,10],[57.7624,-5.5999,10],[57.76,-5.5956,13],[57.7552,-5.5934,21],[57.7505,-5.584,26],[57.7484,-5.5768,30],[57.7482,-5.5706,28],[57.7493,-5.5641,20],[57.7489,-5.559,29],[57.7526,-5.5524,30],[57.7541,-5.5476,30],[57.7543,-5.5432,35],[57.754,-5.5364,57],[57.7529,-5.5329,71],[57.7528,-5.5286,79],[57.7522,-5.5191,119],[57.7497,-5.5125,148],[57.7469,-5.5063,176],[57.7463,-5.5031,182],[57.7445,-5.4996,193],[57.7434,-5.4947,202],[57.7421,-5.4911,215],[57.7408,-5.4883,220],[57.7385,-5.4832,218],[57.7372,-5.4796,207],[57.7367,-5.4752,200],[57.7365,-5.4733,202],[57.736,-5.4714,205],[57.7356,-5.4697,207],[57.735,-5.4676,210],[57.7345,-5.4656,210],[57.7334,-5.4618,210],[57.7277,-5.4555,210],[57.7267,-5.4537,215],[57.7248,-5.4423,224],[57.7259,-5.4327,220],[57.7219,-5.4164,200],[57.7239,-5.4051,175],[57.7302,-5.4,181],[57.7349,-5.3934,202],[57.7342,-5.3848,227],[57.7344,-5.3761,320],[57.7356,-5.3693,424],[57.7402,-5.3629,475],[57.7419,-5.3586,520],[57.7446,-5.3505,510],[57.7471,-5.3209,491],[57.75,-5.3166,389],[57.7515,-5.3131,308],[57.7518,-5.3078,246],[57.754,-5.292,177],[57.7547,-5.2827,128],[57.7565,-5.2767,114],[57.7609,-5.2747,101],[57.7669,-5.2744,95],[57.771,-5.2753,91],[57.7735,-5.2733,90],[57.7806,-5.2762,90],[57.7779,-5.2601,100],[57.7752,-5.2552,100],[57.7739,-5.2523,112],[57.7728,-5.2486,120],[57.772,-5.2454,120],[57.7713,-5.2413,113],[57.7701,-5.2381,110],[57.7685,-5.2347,115],[57.7671,-5.2304,120],[57.7652,-5.2259,120],[57.7644,-5.2217,120],[57.7631,-5.2175,120],[57.7616,-5.2134,122],[57.7597,-5.2127,125],[57.7573,-5.209,138],[57.7593,-5.2086,167],[57.7601,-5.207,193],[57.7612,-5.2061,218],[57.7639,-5.208,234],[57.7661,-5.2089,263],[57.7685,-5.209,299],[57.7709,-5.208,324],[57.774,-5.2078,349],[57.7761,-5.2074,363],[57.7787,-5.2067,373],[57.7815,-5.206,382],[57.7834,-5.205,390],[57.7852,-5.2029,376],[57.7874,-5.2007,370],[57.7892,-5.1983,370],[57.7912,-5.1952,368],[57.7926,-5.1921,339],[57.7937,-5.191,310],[57.7958,-5.1881,257],[57.7988,-5.1877,249],[57.8032,-5.1882,203],[57.8066,-5.1849,154],[57.8094,-5.1825,127],[57.8137,-5.1772,70],[57.8213,-5.1795,49],[57.8313,-5.1892,30],[57.8376,-5.2038,21],[57.8418,-5.2209,10]],"6":[[57.8417,-5.2207,10],[57.8395,-5.2109,12],[57.8396,-5.1983,10],[57.8414,-5.1957,22],[57.8385,-5.1884,29],[57.8355,-5.1867,30],[57.8343,-5.1848,30],[57.8317,-5.1814,30],[57.8288,-5.1816,30],[57.8268,-5.1821,30],[57.8222,-5.1785,39],[57.8208,-5.1752,50],[57.8184,-5.1672,157],[57.8192,-5.1603,208],[57.8193,-5.1562,245],[57.8183,-5.1462,280],[57.8178,-5.1395,273],[57.8169,-5.1354,280],[57.8162,-5.131,311],[57.8154,-5.1286,331],[57.8148,-5.1227,372],[57.8144,-5.1193,391],[57.8145,-5.1164,396],[57.8149,-5.1137,400],[57.8156,-5.1114,400],[57.8161,-5.1087,394],[57.8164,-5.1058,390],[57.8162,-5.1023,392],[57.8156,-5.0998,400],[57.8148,-5.0991,400],[57.8145,-5.0958,400],[57.814,-5.0936,395],[57.813,-5.0911,386],[57.8122,-5.088,381],[57.8109,-5.0856,368],[57.8102,-5.0842,354],[57.8091,-5.0814,332],[57.8087,-5.078,302],[57.8074,-5.0749,245],[57.8037,-5.0722,139],[57.8085,-5.0693,19],[57.8082,-5.064,10],[57.8163,-5.0591,10],[57.8252,-5.0644,10],[57.8388,-5.0741,23],[57.8494,-5.0783,33],[57.8566,-5.087,68],[57.8655,-5.092,27],[57.8732,-5.1019,40],[57.882,-5.1254,40],[57.8889,-5.1371,37],[57.8943,-5.1433,33],[57.8967,-5.151,12],[57.8974,-5.1555,11],[57.9013,-5.1565,23],[57.9034,-5.153,109],[57.9064,-5.134,160],[57.907,-5.12,121],[57.9087,-5.1165,84],[57.9114,-5.1113,81],[57.9116,-5.1028,84],[57.9111,-5.0949,86],[57.9108,-5.0887,88],[57.9104,-5.087,89],[57.9098,-5.08,90],[57.9105,-5.0715,90],[57.9101,-5.065,90],[57.909,-5.0584,90],[57.9075,-5.0437,90],[57.9072,-5.0356,90],[57.9063,-5.0266,93],[57.9052,-5.0193,96],[57.9054,-5.0098,99],[57.9051,-5.0023,100],[57.904,-4.9937,108],[57.9026,-4.9886,110],[57.9006,-4.9826,110],[57.897,-4.9739,120],[57.895,-4.9667,130],[57.8941,-4.9601,173],[57.8939,-4.9548,214],[57.8958,-4.9472,250],[57.8982,-4.9415,250],[57.9002,-4.9359,248],[57.9013,-4.9327,250],[57.9027,-4.9284,250],[57.9042,-4.9236,250],[57.9056,-4.9181,237],[57.9064,-4.9149,230],[57.9071,-4.9115,219],[57.9084,-4.9076,211],[57.9097,-4.903,210],[57.9113,-4.9,211],[57.913,-4.8967,216],[57.9166,-4.8913,220],[57.9215,-4.8827,226],[57.9248,-4.8746,226],[57.9287,-4.868,220],[57.9317,-4.8632,216],[57.9349,-4.8532,184],[57.9377,-4.8391,121],[57.9373,-4.834,123],[57.9356,-4.827,130],[57.9336,-4.8237,130],[57.9327,-4.8183,139],[57.9329,-4.8147,132],[57.935,-4.8064,100],[57.9377,-4.7958,120],[57.9434,-4.7824,102],[57.9472,-4.7643,90],[57.9487,-4.757,98],[57.9555,-4.7429,72],[57.9613,-4.7297,30],[57.9635,-4.7249,30],[57.9673,-4.7304,38],[57.9683,-4.7116,70],[57.973,-4.6845,50],[57.973,-4.653,27],[57.9752,-4.645,20],[57.9752,-4.6267,20],[57.9737,-4.605,10],[57.9709,-4.6052,16],[57.9694,-4.5996,40],[57.9655,-4.5802,40],[57.9571,-4.5596,70],[57.9474,-4.536,61],[57.9465,-4.5194,80],[57.9478,-4.5071,80],[57.9462,-4.4861,94],[57.9455,-4.4778,95],[57.9447,-4.4679,87],[57.9448,-4.4583,65],[57.946,-4.4523,46],[57.9451,-4.446,33],[57.9436,-4.4426,27],[57.9423,-4.4383,23],[57.9406,-4.4283,18],[57.9354,-4.4219,13],[57.9266,-4.409,10],[57.9227,-4.407,20],[57.9174,-4.4028,15],[57.9126,-4.3985,10],[57.91,-4.3983,10],[57.9028,-4.3867,19],[57.8949,-4.3757,20],[57.8901,-4.3846,30],[57.8858,-4.3867,19],[57.8852,-4.3677,13],[57.8848,-4.3624,10],[57.8906,-4.351,10],[57.8948,-4.348,12]],"7":[[57.8925,-4.3457,19],[57.8909,-4.3502,10],[57.8849,-4.3623,10],[57.8851,-4.3671,13],[57.8829,-4.3904,29],[57.8827,-4.4131,40],[57.8819,-4.4303,40],[57.8849,-4.4561,40],[57.8929,-4.4878,50],[57.8958,-4.501,60],[57.8963,-4.5071,60],[57.8988,-4.5213,62],[57.8938,-4.5378,79],[57.887,-4.5516,90],[57.8879,-4.5549,88],[57.8851,-4.5621,90],[57.8812,-4.5759,110],[57.8708,-4.5798,112],[57.8653,-4.59,130],[57.8631,-4.6003,139],[57.8648,-4.6149,156],[57.8672,-4.6251,170],[57.8669,-4.6326,187],[57.8618,-4.6374,220],[57.8548,-4.648,210],[57.8483,-4.6632,217],[57.8433,-4.6813,220],[57.836,-4.6938,223],[57.8273,-4.7255,242],[57.8199,-4.7426,276],[57.8181,-4.744,280],[57.817,-4.7448,280],[57.8153,-4.7478,280],[57.8137,-4.7487,280],[57.8122,-4.7498,287],[57.8116,-4.7508,292],[57.8106,-4.7521,301],[57.8101,-4.7537,313],[57.8084,-4.7527,326],[57.8068,-4.7524,339],[57.8047,-4.7513,353],[57.8031,-4.7518,360],[57.8013,-4.7537,360],[57.7989,-4.7575,340],[57.7972,-4.7585,337],[57.7952,-4.7614,334],[57.7931,-4.7656,330],[57.7918,-4.7679,327],[57.7894,-4.7696,321],[57.7872,-4.7716,303],[57.785,-4.7724,296],[57.7833,-4.7721,291],[57.7811,-4.7734,283],[57.7792,-4.7742,280],[57.7754,-4.7748,280],[57.7687,-4.7734,280],[57.7651,-4.773,280],[57.7569,-4.7752,280],[57.7496,-4.7756,280],[57.7435,-4.7766,280],[57.7368,-4.7742,302],[57.7312,-4.7677,270],[57.7303,-4.765,256],[57.7219,-4.7628,236],[57.7111,-4.7518,230],[57.7019,-4.7375,228],[57.6972,-4.7216,202],[57.6883,-4.703,184],[57.6853,-4.6814,163],[57.6811,-4.677,167],[57.6759,-4.6713,210],[57.6687,-4.6703,195],[57.6634,-4.6799,188],[57.658,-4.6855,181],[57.648,-4.6907,153],[57.6407,-4.6888,140],[57.6344,-4.682,112],[57.6272,-4.6871,88],[57.621,-4.6799,80],[57.6146,-4.6732,80],[57.6116,-4.6695,100],[57.6071,-4.667,96],[57.6038,-4.6614,80],[57.6021,-4.6567,99],[57.6013,-4.6484,89],[57.6001,-4.6419,80],[57.5968,-4.6426,80],[57.5959,-4.6372,80],[57.5966,-4.6316,79],[57.5992,-4.6247,76],[57.5979,-4.6192,73],[57.5982,-4.6104,70],[57.5963,-4.6068,70],[57.5932,-4.6004,80],[57.5906,-4.5982,88],[57.5878,-4.5987,100],[57.5845,-4.5952,90],[57.5818,-4.589,115],[57.5763,-4.5847,73],[57.5707,-4.582,41],[57.5673,-4.579,30],[57.5629,-4.5733,26],[57.5584,-4.5451,24],[57.5488,-4.5398,20],[57.5459,-4.5182,20],[57.5447,-4.4995,20],[57.5429,-4.5008,20],[57.5425,-4.4992,20],[57.536,-4.4866,23],[57.5395,-4.4811,21],[57.5369,-4.4742,21],[57.5314,-4.4638,37],[57.5292,-4.4583,40],[57.5293,-4.4524,46],[57.5284,-4.4487,66],[57.5265,-4.4478,71],[57.5227,-4.4528,54],[57.5202,-4.4531,38],[57.5206,-4.4473,40],[57.5206,-4.4317,48],[57.5198,-4.4252,50],[57.5201,-4.4152,70],[57.5221,-4.3874,60],[57.5185,-4.3781,48],[57.5142,-4.373,24],[57.5129,-4.3674,11],[57.512,-4.3657,10],[57.5123,-4.3622,10],[57.5092,-4.3511,10],[57.5053,-4.3394,10],[57.5055,-4.3257,10],[57.5027,-4.3107,10],[57.5036,-4.3039,10],[57.5049,-4.2926,10],[57.5045,-4.2844,10],[57.5046,-4.2788,10],[57.5052,-4.2728,10],[57.5046,-4.2669,10],[57.5025,-4.2556,10],[57.5012,-4.2437,12],[57.5018,-4.2376,30],[57.4947,-4.22,10],[57.4951,-4.223,10],[57.4933,-4.2277,10],[57.4896,-4.2327,10],[57.488,-4.2297,10],[57.486,-4.2288,10],[57.4828,-4.2301,10],[57.4809,-4.2285,10],[57.4806,-4.2243,10],[57.48,-4.2238,11]]};
+const STAGE_COLORS = {2:'#56d364',3:'#79c0ff',4:'#d2a8ff',5:'#ffa657',6:'#ff7b72',7:'#e3b341'};
+
+function rideSplitIndex(pts, targetKm) {
+  let acc = 0;
+  for (let i=1; i<pts.length; i++) {
+    acc += haversineKm(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+    if (acc >= targetKm) return i;
+  }
+  return pts.length - 1;
+}
+
+function parseExifGps(buffer) {
+  const view = new DataView(buffer);
+  if (view.getUint16(0) !== 0xFFD8) return null;
+  let offset = 2;
+  while (offset < view.byteLength - 4) {
+    const marker = view.getUint16(offset);
+    if (marker === 0xFFE1) {
+      const exifStart = offset + 4;
+      if (view.getUint32(exifStart) !== 0x45786966) return null;
+      const tiffStart = exifStart + 6;
+      const little = view.getUint16(tiffStart) === 0x4949;
+      const getU16 = o => view.getUint16(o, little);
+      const getU32 = o => view.getUint32(o, little);
+      const ifd0Offset = tiffStart + getU32(tiffStart+4);
+      const numEntries = getU16(ifd0Offset);
+      let gpsIfdOffset = null;
+      for (let i=0; i<numEntries; i++) {
+        const entryOffset = ifd0Offset + 2 + i*12;
+        if (getU16(entryOffset) === 0x8825) { gpsIfdOffset = tiffStart + getU32(entryOffset+8); break; }
+      }
+      if (!gpsIfdOffset) return null;
+      const gpsEntries = getU16(gpsIfdOffset);
+      const gps = {};
+      const readRational = o => { const num=getU32(o), den=getU32(o+4); return den ? num/den : 0; };
+      for (let i=0; i<gpsEntries; i++) {
+        const entryOffset = gpsIfdOffset + 2 + i*12;
+        const tag = getU16(entryOffset);
+        const valueOffset = tiffStart + getU32(entryOffset+8);
+        if (tag === 1) gps.latRef = String.fromCharCode(view.getUint8(entryOffset+8));
+        else if (tag === 2) gps.lat = [readRational(valueOffset), readRational(valueOffset+8), readRational(valueOffset+16)];
+        else if (tag === 3) gps.lonRef = String.fromCharCode(view.getUint8(entryOffset+8));
+        else if (tag === 4) gps.lon = [readRational(valueOffset), readRational(valueOffset+8), readRational(valueOffset+16)];
+      }
+      if (!gps.lat || !gps.lon) return null;
+      const toDeg = ([d,m,s]) => d + m/60 + s/3600;
+      let lat = toDeg(gps.lat), lon = toDeg(gps.lon);
+      if (gps.latRef === 'S') lat = -lat;
+      if (gps.lonRef === 'W') lon = -lon;
+      return { lat, lon };
+    } else if ((marker & 0xFF00) !== 0xFF00) {
+      break;
+    } else {
+      offset += 2 + view.getUint16(offset+2);
+    }
+  }
+  return null;
+}
+
+function resizeImageFile(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height && width > maxDim) { height = height * maxDim / width; width = maxDim; }
+      else if (height >= width && height > maxDim) { width = width * maxDim / height; height = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(width); canvas.height = Math.round(height);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Nie udało się wczytać zdjęcia')); };
+    img.src = url;
+  });
+}
+
+function findLivetrack(p) { return livetrack.find(l => l.id === p) || { id:p, url:'', active:false }; }
+
+async function upsertLivetrack(payload) {
+  const idx = livetrack.findIndex(l => l.id === payload.id);
+  if (idx >= 0) livetrack[idx] = payload; else livetrack.push(payload);
+  cacheSet(CK.livetrack, livetrack);
+  try { const r = await pub.from('livetrack').upsert(payload); if (r.error) throw r.error; }
+  catch(e){ queueWrite({ target:'pub', table:'livetrack', op:'upsert', data:payload }); }
+}
+async function saveLivetrackUrl(p) {
+  const url = document.getElementById(`liveUrl_${p}`).value.trim();
+  const cur = findLivetrack(p);
+  await upsertLivetrack({ id:p, url, active:cur.active, updated_at:new Date().toISOString() });
+  renderRelacja();
+}
+async function toggleLivetrackActive(p) {
+  const cur = findLivetrack(p);
+  await upsertLivetrack({ id:p, url:cur.url, active:!cur.active, updated_at:new Date().toISOString() });
+  renderRelacja();
+}
+
+async function relOnFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  relPendingFile = file;
+  relPendingGps = null;
+  try { relPendingGps = parseExifGps(await file.arrayBuffer()); }
+  catch(e) { console.warn('parseExifGps:', e.message); }
+  const preview = document.getElementById('relPreview');
+  if (preview) { preview.src = URL.createObjectURL(file); preview.style.display = 'block'; }
+}
+
+async function publishUpdate() {
+  if (!relPendingFile) { alert('Wybierz zdjęcie'); return; }
+  if (!navigator.onLine) { alert('Brak internetu — zdjęcie zostaje w formularzu, spróbuj ponownie gdy będziesz online.'); return; }
+  const btn = document.getElementById('relPublishBtn');
+  btn.disabled = true; btn.textContent = 'Wysyłanie...';
+  try {
+    const blob = await resizeImageFile(relPendingFile, 1600, 0.8);
+    let gps = relPendingGps;
+    if (!gps && navigator.geolocation) {
+      gps = await new Promise(res => navigator.geolocation.getCurrentPosition(
+        p => res({ lat:p.coords.latitude, lon:p.coords.longitude }),
+        () => res(null), { timeout:5000 }
+      ));
+    }
+    const fname = `${uuid()}.jpg`;
+    const { error: upErr } = await pub.storage.from('photos').upload(fname, blob, { contentType:'image/jpeg' });
+    if (upErr) throw upErr;
+    const { data: pubUrlData } = pub.storage.from('photos').getPublicUrl(fname);
+    const cyclingDays = DAYS.filter(x=>x.km);
+    const curDay = cyclingDays[todayDayIdx !== null ? todayDayIdx : defaultCyclingIdx()];
+    const item = {
+      id: uuid(), day: curDay ? curDay.day : null,
+      caption: document.getElementById('relCaption').value.trim(),
+      photo_url: pubUrlData.publicUrl,
+      lat: gps?.lat ?? null, lon: gps?.lon ?? null,
+      author: PL[me] || me, created_at: new Date().toISOString(),
+    };
+    const { error: insErr } = await pub.from('updates').insert(item);
+    if (insErr) throw insErr;
+    updates.unshift(item); cacheSet(CK.updates, updates);
+    relPendingFile = null; relPendingGps = null;
+    document.getElementById('relCaption').value = '';
+    document.getElementById('relPhotoInput').value = '';
+    document.getElementById('relPreview').style.display = 'none';
+    renderRelacja();
+  } catch(e) {
+    alert('Nie udało się wysłać zdjęcia: ' + e.message + '. Spróbuj ponownie.');
+  } finally {
+    btn.disabled = false; btn.textContent = '📤 Opublikuj';
+  }
+}
+
+async function deleteUpdate(id) {
+  const item = updates.find(u => u.id === id);
+  updates = updates.filter(u => u.id !== id); cacheSet(CK.updates, updates);
+  renderRelacja();
+  try {
+    const r = await pub.from('updates').delete().eq('id', id);
+    if (r.error) throw r.error;
+    const fname = item?.photo_url?.split('/photos/').pop();
+    if (fname) await pub.storage.from('photos').remove([fname]);
+  } catch(e){ queueWrite({ target:'pub', table:'updates', op:'delete', id }); }
+}
+
+async function manualPublishProgress() {
+  const cyclingDays = DAYS.filter(x=>x.km);
+  const d = cyclingDays[todayDayIdx !== null ? todayDayIdx : defaultCyclingIdx()];
+  if (!d) return;
+  const riddenKm = Math.max(0, parseFloat(ov(`day.${d.day}.riddenKm`,'0'))||0);
+  await publishProgress(d.day, riddenKm);
+  renderRelacja();
+}
+
+function projectRoute(targetW, targetH) {
+  let minLat=90, maxLat=-90, minLon=180, maxLon=-180;
+  for (const day in ROUTES) for (const [lat,lon] of ROUTES[day]) {
+    if (lat<minLat) minLat=lat; if (lat>maxLat) maxLat=lat;
+    if (lon<minLon) minLon=lon; if (lon>maxLon) maxLon=lon;
+  }
+  const cosLat = Math.cos((minLat+maxLat)/2 * Math.PI/180);
+  const lonSpan = (maxLon-minLon)*cosLat || 1;
+  const latSpan = (maxLat-minLat) || 1;
+  const scale = Math.min(targetW/lonSpan, targetH/latSpan);
+  const offX = (targetW - lonSpan*scale)/2;
+  const offY = (targetH - latSpan*scale)/2;
+  return ([lat,lon]) => [offX + (lon-minLon)*cosLat*scale, offY + (maxLat-lat)*scale];
+}
+
+function drawStoryMap(ctx, x, y, w, h, currentDay, riddenKm) {
+  const project = projectRoute(w, h);
+  Object.keys(ROUTES).forEach(dayStr => {
+    const day = parseInt(dayStr,10);
+    const pts = ROUTES[day].map(project);
+    const color = STAGE_COLORS[day] || '#8b949e';
+    ctx.beginPath();
+    pts.forEach(([px,py],i) => { const cx=x+px, cy=y+py; i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy); });
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.4; ctx.lineWidth = 5; ctx.lineJoin='round'; ctx.lineCap='round'; ctx.stroke();
+    const done = currentDay==null ? 0 : (day < currentDay ? pts.length : (day === currentDay ? rideSplitIndex(ROUTES[day], riddenKm||0)+1 : 0));
+    if (done > 1) {
+      ctx.beginPath();
+      pts.slice(0, done).forEach(([px,py],i) => { const cx=x+px, cy=y+py; i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy); });
+      ctx.strokeStyle = color; ctx.globalAlpha = 1; ctx.lineWidth = 9; ctx.stroke();
+    }
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawGradientBg(ctx, w, h) {
+  const g = ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0, '#0d1117'); g.addColorStop(1, '#161b22');
+  ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
+}
+
+function loadImageCors(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function generateStoryImage() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080; canvas.height = 1920;
+  const ctx = canvas.getContext('2d');
+
+  const cyclingDays = DAYS.filter(x=>x.km);
+  const idx = todayDayIdx !== null ? todayDayIdx : defaultCyclingIdx();
+  const d = cyclingDays[idx];
+  const riddenKm = d ? Math.max(0, parseFloat(ov(`day.${d.day}.riddenKm`,'0'))||0) : 0;
+  const doneTotal = cyclingDays.filter(x=>d && x.day<d.day).reduce((s,x)=>s+x.km,0) + riddenKm;
+
+  const lastPhoto = updates[0];
+  let bgDrawn = false;
+  if (lastPhoto?.photo_url) {
+    try {
+      const img = await loadImageCors(lastPhoto.photo_url);
+      const scale = Math.max(canvas.width/img.width, canvas.height/img.height);
+      const iw = img.width*scale, ih = img.height*scale;
+      ctx.drawImage(img, (canvas.width-iw)/2, (canvas.height-ih)/2, iw, ih);
+      ctx.fillStyle = 'rgba(13,17,23,0.55)';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      bgDrawn = true;
+    } catch(e) { console.warn('story bg photo:', e.message); }
+  }
+  if (!bgDrawn) drawGradientBg(ctx, canvas.width, canvas.height);
+
+  drawStoryMap(ctx, 90, 260, 900, 900, d ? d.day : null, riddenKm);
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.font = '700 64px -apple-system, Segoe UI, sans-serif';
+  ctx.fillText('HIGHLANDS 2026', 540, 140);
+  if (d) {
+    ctx.font = '600 44px -apple-system, Segoe UI, sans-serif';
+    ctx.fillText(`DZIEŃ ${idx+1} / ${cyclingDays.length}`, 540, 1250);
+  }
+  ctx.font = '800 96px -apple-system, Segoe UI, sans-serif';
+  ctx.fillStyle = '#56d364';
+  ctx.fillText(`${Math.round(doneTotal)} / 513 km`, 540, 1370);
+  if (d) {
+    ctx.font = '500 38px -apple-system, Segoe UI, sans-serif';
+    ctx.fillStyle = '#c9d1d9';
+    ctx.fillText(`${d.el} m ⛰️ dzisiaj · ${d.title}`, 540, 1430);
+  }
+  ctx.font = '600 36px -apple-system, Segoe UI, sans-serif';
+  ctx.fillStyle = '#8b949e';
+  ctx.fillText('dantiscvs.github.io/highlands-live', 540, 1840);
+
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+async function downloadStory() {
+  const btn = document.getElementById('storyBtn');
+  btn.disabled = true; btn.textContent = 'Generuję...';
+  try {
+    const blob = await generateStoryImage();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `highlands-story-${Date.now()}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Nie udało się wygenerować grafiki: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = '📲 Pobierz story'; }
+}
+
+function renderRelacja() {
+  const c = document.getElementById('trel');
+  const cyclingDays = DAYS.filter(x=>x.km);
+  const idx = todayDayIdx !== null ? todayDayIdx : defaultCyclingIdx();
+  const d = cyclingDays[idx];
+  const riddenKm = d ? Math.max(0, parseFloat(ov(`day.${d.day}.riddenKm`,'0'))||0) : 0;
+
+  c.innerHTML = `
+    <div class="sh">📸 Relacja — publiczny LP</div>
+    <p style="color:#8b949e;font-size:13px;margin-bottom:16px;">Zdjęcia, live track i postęp widoczne na <a href="https://dantiscvs.github.io/highlands-live/" target="_blank" rel="noopener">dantiscvs.github.io/highlands-live</a>.</p>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:12px;">+ Dodaj zdjęcie</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <input type="file" accept="image/*" id="relPhotoInput" onchange="relOnFileSelected(this)">
+        <img id="relPreview" style="display:none;max-height:180px;border-radius:8px;object-fit:cover;">
+        <input type="text" id="relCaption" placeholder="Podpis (opcjonalnie)">
+        <button class="btn btn-g" id="relPublishBtn" onclick="publishUpdate()">📤 Opublikuj</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:12px;">🔴 Wahoo Live Track</div>
+      ${PS.map(p => { const l = findLivetrack(p); return `
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <div class="av ${l.active?'on':''}" style="--ac:${PC[p]};--abg:${PBG[p]};" title="${PL[p]}">${PL[p][0]}</div>
+          <input type="text" id="liveUrl_${p}" placeholder="Link Wahoo — ${PL[p]}" value="${esc(l.url)}" style="flex:1;min-width:140px;">
+          <button class="btn btn-sm" onclick="saveLivetrackUrl('${p}')">Zapisz</button>
+          <button class="btn btn-sm ${l.active?'btn-g':''}" onclick="toggleLivetrackActive('${p}')">${l.active?'🔴 Live':'Wyłączony'}</button>
+        </div>`; }).join('')}
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📍 Postęp na LP</div>
+      <div style="font-size:13px;color:#8b949e;margin-bottom:10px;">
+        ${d ? `Dzień ${d.day} · ${riddenKm.toFixed(1)} / ${d.km} km dzisiaj` : 'Brak danych na dziś'}
+        ${progressPub.updated_at ? `<br>Ostatnia publikacja: ${new Date(progressPub.updated_at).toLocaleTimeString('pl-PL',{hour:'2-digit',minute:'2-digit'})}` : ''}
+      </div>
+      <button class="btn btn-g" onclick="manualPublishProgress()">🔄 Publikuj teraz</button>
+    </div>
+
+    <div class="card" style="padding:16px;margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📲 Grafika na Instagram Stories</div>
+      <button class="btn btn-g" id="storyBtn" onclick="downloadStory()">📲 Pobierz story</button>
+    </div>
+
+    <div class="sh" style="margin-top:8px;">Opublikowane zdjęcia (${updates.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">
+      ${updates.length===0 ? '<div style="grid-column:1/-1;text-align:center;color:#8b949e;padding:20px 0;">Brak zdjęć.</div>' : updates.map(u => `
+        <div class="card" style="margin-bottom:0;overflow:hidden;">
+          <img src="${esc(u.photo_url)}" style="width:100%;height:100px;object-fit:cover;display:block;">
+          <button onclick="deleteUpdate('${u.id}')" style="width:100%;background:#21262d;border:none;color:#ff7b72;font-size:11px;padding:4px;cursor:pointer;">Usuń</button>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
 // ===== INIT =====
-let snap = { content:'', tasks:'', pkgs:'', sights:'', expenses:'' };
+let snap = { content:'', tasks:'', pkgs:'', sights:'', expenses:'', updates:'', livetrack:'', progress:'' };
 function snapOf(v) { try { return JSON.stringify(v); } catch { return ''; } }
 
 async function refreshAll() {
-  await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights(), loadExpenses()]);
+  await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights(), loadExpenses(), loadUpdates(), loadLivetrack(), loadProgressPub()]);
   const nc = snapOf(content), nt = snapOf(tasks), np = snapOf(pkgs), ns = snapOf(sights), ne = snapOf(expenses);
+  const nu = snapOf(updates), nl = snapOf(livetrack), npr = snapOf(progressPub);
   if (nc !== snap.content || ns !== snap.sights) renderPlan();
   if (nt !== snap.tasks) renderTasks();
   if (np !== snap.pkgs) renderPack();
   if (ns !== snap.sights) renderSights();
   if (ne !== snap.expenses) renderExpensesTab();
-  snap = { content:nc, tasks:nt, pkgs:np, sights:ns, expenses:ne };
+  if ((nu !== snap.updates || nl !== snap.livetrack || npr !== snap.progress) && document.getElementById('trel').style.display !== 'none') renderRelacja();
+  snap = { content:nc, tasks:nt, pkgs:np, sights:ns, expenses:ne, updates:nu, livetrack:nl, progress:npr };
   if (document.getElementById('tst').style.display !== 'none') renderStart();
 }
 
@@ -1582,7 +1984,7 @@ async function init() {
   if (!me) { document.getElementById('umodal').style.display='flex'; }
   else { document.getElementById('umodal').style.display='none'; updBadge(); }
 
-  const [cOk, tOk, pOk, sOk] = await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights(), loadExpenses()]);
+  const [cOk, tOk, pOk, sOk] = await Promise.all([loadContent(), loadTasks(), loadPkg(), loadSights(), loadExpenses(), loadUpdates(), loadLivetrack(), loadProgressPub()]);
   renderPlan();
   if (tOk && tasks.length===0) await seedTasks();
   renderTasks();
@@ -1591,8 +1993,9 @@ async function init() {
   if (sOk && sights.length===0) await seedSights();
   renderSights();
   renderExpensesTab();
+  renderRelacja();
   renderStart();
-  snap = { content:snapOf(content), tasks:snapOf(tasks), pkgs:snapOf(pkgs), sights:snapOf(sights), expenses:snapOf(expenses) };
+  snap = { content:snapOf(content), tasks:snapOf(tasks), pkgs:snapOf(pkgs), sights:snapOf(sights), expenses:snapOf(expenses), updates:snapOf(updates), livetrack:snapOf(livetrack), progress:snapOf(progressPub) };
 
   await flushPending();
 
@@ -1623,7 +2026,7 @@ function updBadge() {
 
 // ===== TABS =====
 function goTab(name) {
-  const map={start:'tst',plan:'tp',today:'ttoday',stats:'tstat',sights:'ts',weather:'twx',flights:'tf',train:'tt',noclegi:'tnoc',budget:'tb',tasks:'tts',packing:'tpk',expenses:'texp'};
+  const map={start:'tst',plan:'tp',today:'ttoday',relacja:'trel',stats:'tstat',sights:'ts',weather:'twx',flights:'tf',train:'tt',noclegi:'tnoc',budget:'tb',tasks:'tts',packing:'tpk',expenses:'texp'};
   Object.values(map).forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById(map[name]).style.display='block';
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
@@ -1635,6 +2038,7 @@ function goTab(name) {
   if(name==='weather') renderWeather();
   if(name==='today') renderToday();
   if(name==='expenses') renderExpensesTab();
+  if(name==='relacja') renderRelacja();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
